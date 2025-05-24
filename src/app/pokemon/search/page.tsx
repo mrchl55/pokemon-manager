@@ -4,9 +4,12 @@ import * as React from 'react';
 import {
   Container, Typography, Grid, Paper, TextField,
   Select, MenuItem, FormControl, InputLabel, Box, CircularProgress, Alert, Pagination, Card, CardContent, CardMedia,
+  Button,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
+import useDebounce from '@/hooks/useDebounce';
+import { useRouter } from 'next/navigation';
 
 interface Pokemon {
   id: number;
@@ -55,6 +58,7 @@ const fetchPokemons = async (
 
 export default function PokemonSearchPage() {
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(10);
@@ -67,13 +71,19 @@ export default function PokemonSearchPage() {
   const [minWeightFilter, setMinWeightFilter] = React.useState('');
   const [maxWeightFilter, setMaxWeightFilter] = React.useState('');
 
+  const debouncedNameFilter = useDebounce(nameFilter, 500);
+  const debouncedMinHeightFilter = useDebounce(minHeightFilter, 500);
+  const debouncedMaxHeightFilter = useDebounce(maxHeightFilter, 500);
+  const debouncedMinWeightFilter = useDebounce(minWeightFilter, 500);
+  const debouncedMaxWeightFilter = useDebounce(maxWeightFilter, 500);
+
   const currentFilters = React.useMemo(() => ({
-    name: nameFilter,
-    minHeight: minHeightFilter,
-    maxHeight: maxHeightFilter,
-    minWeight: minWeightFilter,
-    maxWeight: maxWeightFilter,
-  }), [nameFilter, minHeightFilter, maxHeightFilter, minWeightFilter, maxWeightFilter]);
+    name: debouncedNameFilter,
+    minHeight: debouncedMinHeightFilter,
+    maxHeight: debouncedMaxHeightFilter,
+    minWeight: debouncedMinWeightFilter,
+    maxWeight: debouncedMaxWeightFilter,
+  }), [debouncedNameFilter, debouncedMinHeightFilter, debouncedMaxHeightFilter, debouncedMinWeightFilter, debouncedMaxWeightFilter]);
 
   const { data, isLoading, error } = useQuery<PaginatedPokemonResponse, Error>({
     queryKey: ['pokemons', page, limit, sortBy, sortOrder, currentFilters],
@@ -91,9 +101,20 @@ export default function PokemonSearchPage() {
 
   return (
     <Container sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Search Pokemon
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: (session ? 2 : 4) }}>
+        <Typography variant="h4" component="h1">
+          Search Pokemon
+        </Typography>
+        {session && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => router.push('/pokemon/add')}
+          >
+            Add New Pokemon
+          </Button>
+        )}
+      </Box>
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6">Filters & Sorting</Typography>

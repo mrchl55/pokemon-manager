@@ -87,28 +87,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, height, weight, image } = body as { name: string, height: number, weight: number, image?: string };
 
-    // basic validation
     if (!name || height === undefined || weight === undefined) {
       return NextResponse.json({ message: 'name, height, and weight are required' }, { status: 400 });
     }
     if (typeof height !== 'number' || typeof weight !== 'number') {
         return NextResponse.json({ message: 'height and weight must be numbers' }, { status: 400 });
     }
-    // more validation can be added (e.g., name length, height/weight ranges)
 
-
-    // const newPokemon = await pokemonService.createPokemon({ name, height, weight, image });
-    // return NextResponse.json(newPokemon, { status: 201 });
-
-    // temporary response until service method is created
-    return NextResponse.json({ message: 'TODO: Implement Pokemon creation in service', data: {name, height, weight, image} }, { status: 200 });
-
+    const newPokemon = await pokemonService.createPokemon({ name, height, weight, image: image || null });
+    return NextResponse.json(newPokemon, { status: 201 });
 
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // handle specific prisma errors, e.g., unique constraint violation
       if (error.code === 'P2002' && error.meta?.target === 'Pokemon_name_key') {
-        return NextResponse.json({ message: 'a pokemon with this name already exists' }, { status: 409 }); 
+        return NextResponse.json({ message: 'a pokemon with this name already exists' }, { status: 409 });
       }
     }
     console.error('api error creating pokemon:', error);

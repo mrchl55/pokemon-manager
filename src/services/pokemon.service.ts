@@ -95,6 +95,34 @@ export class PokemonService {
       throw new Error('failed to fetch pokemon data');
     }
   }
+
+  async createPokemon(data: { name: string; height: number; weight: number; image?: string | null }) {
+    // additional validation could be done here if needed
+    try {
+      const newPokemon = await prisma.pokemon.create({
+        data: {
+          name: data.name,
+          height: data.height,
+          weight: data.weight,
+          image: data.image || null, // Ensure image is null if undefined or empty string
+        },
+        select: { // select the fields to return
+          id: true,
+          name: true,
+          height: true,
+          weight: true,
+          image: true,
+          createdAt: true,
+          updatedAt: true,
+        }
+      });
+      return newPokemon;
+    } catch (error) {
+      // the route handler will catch PrismaClientKnownRequestError for unique constraints
+      console.error('error creating pokemon in service:', error);
+      throw error; // re-throw the error to be handled by the route
+    }
+  }
 }
 
 export const pokemonService = new PokemonService(); 

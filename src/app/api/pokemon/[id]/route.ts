@@ -56,3 +56,33 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
   }
 }
 
+export async function DELETE(request: Request, { params }: { params: RouteParams }) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user) {
+    return NextResponse.json({ message: 'unauthorized. please log in.' }, { status: 401 });
+  }
+
+  const { id } = params;
+  const pokemonId = parseInt(id, 10);
+
+  if (isNaN(pokemonId)) {
+    return NextResponse.json({ message: 'invalid pokemon id' }, { status: 400 });
+  }
+
+  try {
+    const wasDeleted = await pokemonService.deletePokemon(pokemonId);
+    if (!wasDeleted) {
+      return NextResponse.json({ message: 'pokemon not found' }, { status: 404 });
+    }
+    return new NextResponse(null, { status: 204 }); 
+  } catch (error: any) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') { 
+        return NextResponse.json({ message: 'pokemon not found' }, { status: 404 });
+      }
+    }
+    console.error(`api error deleting pokemon ${pokemonId}:`, error);
+    return NextResponse.json({ message: 'error deleting pokemon' }, { status: 500 });
+  }
+}
+

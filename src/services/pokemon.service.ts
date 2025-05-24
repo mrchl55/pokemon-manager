@@ -32,9 +32,7 @@ export class PokemonService {
     sortOrder: 'asc' | 'desc' = 'asc', 
     filters: PokemonFilters = {}
   ): Promise<PaginatedPokemonResponse> {
-    // ensure page is at least 1
     const currentPage = Math.max(1, page);
-    // validate and set page size
     const pageSize = ALLOWED_PAGE_SIZES.includes(limit) ? limit : DEFAULT_PAGE_SIZE;
 
     const offset = (currentPage - 1) * pageSize;
@@ -104,7 +102,7 @@ export class PokemonService {
           name: data.name,
           height: data.height,
           weight: data.weight,
-          image: data.image || null, // Ensure image is null if undefined or empty string
+          image: data.image || null, 
         },
         select: { // select the fields to return
           id: true,
@@ -160,6 +158,24 @@ export class PokemonService {
       // specific errors like P2002 (unique constraint) will be caught by route handler
       console.error(`error updating pokemon with id ${id} in service:`, error);
       throw error; // re-throw
+    }
+  }
+
+  async deletePokemon(id: number): Promise<boolean> {
+    try {
+ 
+      // alternatively, we can findUnique first if we want to return a more specific boolean/object.
+      await prisma.pokemon.delete({
+        where: { id },
+      });
+      return true; // successfully deleted
+    } catch (error: any) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        console.warn(`pokemon with id ${id} not found for deletion.`);
+        return false; 
+      }
+      console.error(`error deleting pokemon with id ${id} in service:`, error);
+      throw error; // re-throw other errors
     }
   }
 }

@@ -1,8 +1,6 @@
-import { PrismaClient, Pokemon } from '@prisma/client';
+import { Pokemon } from '@prisma/client';
 import { Prisma } from '@prisma/client'; 
-
-const prisma = new PrismaClient();
-
+import { prisma } from '@/lib/prisma';
 
 const ALLOWED_PAGE_SIZES = [10, 20, 50];
 const DEFAULT_PAGE_SIZE = 10;

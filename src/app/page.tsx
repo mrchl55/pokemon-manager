@@ -1,12 +1,14 @@
-'use client'; // Make it a client component
+'use client'; 
 
 import * as React from 'react';
-import { AppBar, Toolbar, Typography, Container, Button, Box } from '@mui/material';
-import Link from 'next/link'; // For client-side navigation
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { AppBar, Toolbar, Typography, Container, Button, Box, CircularProgress } from '@mui/material';
+import Link from 'next/link'; 
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation'; 
 
 export default function HomePage() {
   const { data: session, status } = useSession();
+  const router = useRouter(); 
   const loading = status === 'loading';
 
   return (
@@ -16,19 +18,33 @@ export default function HomePage() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Pokemon Manager
           </Typography>
-          {session?.user ? (
+          {loading ? (
+            <CircularProgress color="inherit" size={24} />
+          ) : session?.user ? (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Typography sx={{ mr: 2 }}>
-                Welcome, {session.user.name || session.user.email}!
+                {session.user.name || session.user.email}
               </Typography>
               <Button color="inherit" onClick={() => signOut()}>
                 Sign Out
               </Button>
             </Box>
           ) : (
-            <Button color="inherit" onClick={() => signIn()}>
-              Sign In
-            </Button>
+            <Box>
+              <Button 
+                color="inherit" 
+                onClick={() => router.push('/auth/login')}
+              >
+                Sign In
+              </Button>
+              <Button 
+                color="inherit" 
+                onClick={() => router.push('/auth/register')}
+                sx={{ ml: 1 }}
+              >
+                Register
+              </Button>
+            </Box>
           )}
         </Toolbar>
       </AppBar>

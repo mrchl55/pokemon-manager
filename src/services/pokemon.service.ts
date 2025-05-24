@@ -1,12 +1,20 @@
 import { PrismaClient, Pokemon } from '@prisma/client';
-import { Prisma } from '@prisma/client'; // import Prisma for types
+import { Prisma } from '@prisma/client'; 
 
 const prisma = new PrismaClient();
 
-// define the allowed page sizes
+
 const ALLOWED_PAGE_SIZES = [10, 20, 50];
 const DEFAULT_PAGE_SIZE = 10;
-const ALLOWED_SORT_BY_FIELDS = ['name', 'height', 'weight']; // define allowed sort fields
+const ALLOWED_SORT_BY_FIELDS = ['name', 'height', 'weight']; 
+
+export interface PokemonFilters {
+  name?: string;
+  minHeight?: number;
+  maxHeight?: number;
+  minWeight?: number;
+  maxWeight?: number;
+}
 
 export interface PaginatedPokemonResponse {
   data: Pick<Pokemon, 'name' | 'height' | 'weight' | 'image'>[];
@@ -20,8 +28,9 @@ export class PokemonService {
   async getAllPokemon(
     page: number = 1,
     limit: number = DEFAULT_PAGE_SIZE,
-    sortBy?: string, // make sortBy optional
-    sortOrder: 'asc' | 'desc' = 'asc' // default sortOrder to 'asc'
+    sortBy?: string, 
+    sortOrder: 'asc' | 'desc' = 'asc', 
+    filters: PokemonFilters = {}
   ): Promise<PaginatedPokemonResponse> {
     // ensure page is at least 1
     const currentPage = Math.max(1, page);
@@ -35,9 +44,24 @@ export class PokemonService {
     if (sortBy && ALLOWED_SORT_BY_FIELDS.includes(sortBy)) {
       orderBy = { [sortBy]: sortOrder };
     } else if (sortBy) {
-      // if sortBy is provided but not allowed, log a warning or handle as an error
       console.warn(`invalid sortBy field: ${sortBy}. defaulting to no sort.`);
-      // or you could throw an error: throw new Error(`Invalid sortBy field: ${sortBy}`);
+    }
+
+    const where: Prisma.PokemonWhereInput = {};
+    if (filters.name) {
+      where.name = { contains: filters.name, mode: 'insensitive' };
+    }
+    if (filters.minHeight !== undefined) {
+      where.height = { ...where.height as Prisma.IntFilter, gte: filters.minHeight };
+    }
+    if (filters.maxHeight !== undefined) {
+      where.height = { ...where.height as Prisma.IntFilter, lte: filters.maxHeight };
+    }
+    if (filters.minWeight !== undefined) {
+      where.weight = { ...where.weight as Prisma.IntFilter, gte: filters.minWeight };
+    }
+    if (filters.maxWeight !== undefined) {
+      where.weight = { ...where.weight as Prisma.IntFilter, lte: filters.maxWeight };
     }
 
     try {
@@ -51,9 +75,10 @@ export class PokemonService {
             weight: true,
             image: true,
           },
-          orderBy: orderBy, // apply sorting
+          where: where,
+          orderBy: orderBy, 
         }),
-        prisma.pokemon.count(), // count all pokemon for pagination
+        prisma.pokemon.count({ where: where }), // count all pokemon for pagination
       ]);
 
       const totalPages = Math.ceil(totalItems / pageSize);

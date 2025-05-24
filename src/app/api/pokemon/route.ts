@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Import authOptions
 import { pokemonService, PokemonFilters } from '@/services/pokemon.service';
+import { Prisma } from '@prisma/client'; // For potential specific types
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -38,7 +41,6 @@ export async function GET(request: Request) {
   }
   const sortBy = sortByParam || undefined;
 
-  // construct filters object
   const filters: PokemonFilters = {};
   if (nameFilter) filters.name = nameFilter;
   
@@ -71,5 +73,45 @@ export async function GET(request: Request) {
       { message: 'error fetching pokemon data. please try again later.' },
       { status: 500 }
     );
+  }
+}
+
+export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user) {
+    return NextResponse.json({ message: 'unauthorized. please log in.' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { name, height, weight, image } = body as { name: string, height: number, weight: number, image?: string };
+
+    // basic validation
+    if (!name || height === undefined || weight === undefined) {
+      return NextResponse.json({ message: 'name, height, and weight are required' }, { status: 400 });
+    }
+    if (typeof height !== 'number' || typeof weight !== 'number') {
+        return NextResponse.json({ message: 'height and weight must be numbers' }, { status: 400 });
+    }
+    // more validation can be added (e.g., name length, height/weight ranges)
+
+
+    // const newPokemon = await pokemonService.createPokemon({ name, height, weight, image });
+    // return NextResponse.json(newPokemon, { status: 201 });
+
+    // temporary response until service method is created
+    return NextResponse.json({ message: 'TODO: Implement Pokemon creation in service', data: {name, height, weight, image} }, { status: 200 });
+
+
+  } catch (error: any) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      // handle specific prisma errors, e.g., unique constraint violation
+      if (error.code === 'P2002' && error.meta?.target === 'Pokemon_name_key') {
+        return NextResponse.json({ message: 'a pokemon with this name already exists' }, { status: 409 }); 
+      }
+    }
+    console.error('api error creating pokemon:', error);
+    return NextResponse.json({ message: 'error creating pokemon' }, { status: 500 });
   }
 } 

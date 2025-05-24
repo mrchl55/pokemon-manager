@@ -23,12 +23,8 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
 
   try {
     const body = await request.json();
-    // allow partial updates: name, height, weight, image can be optional
     const { name, height, weight, image } = body as { name?: string, height?: number, weight?: number, image?: string | null };
 
-    // basic validation: ensure at least one field is being updated if we want to enforce that,
-    // or that provided fields are of correct type.
-    // for now, service will handle actual update logic.
     if (Object.keys(body).length === 0) {
         return NextResponse.json({ message: 'no update data provided' }, { status: 400 });
     }
@@ -39,23 +35,19 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
         return NextResponse.json({ message: 'weight must be a number' }, { status: 400 });
     }
 
+    const updatedPokemon = await pokemonService.updatePokemon(pokemonId, { name, height, weight, image });
+    if (!updatedPokemon) {
 
-    // placeholder for service call
-    // const updatedPokemon = await pokemonService.updatePokemon(pokemonId, { name, height, weight, image });
-    // if (!updatedPokemon) {
-    //   return NextResponse.json({ message: 'pokemon not found or update failed' }, { status: 404 });
-    // }
-    // return NextResponse.json(updatedPokemon);
-
-    // temporary response
-    return NextResponse.json({ message: 'TODO: Implement Pokemon update in service', data: { id: pokemonId, name, height, weight, image }});
+      return NextResponse.json({ message: 'pokemon not found or update failed' }, { status: 404 });
+    }
+    return NextResponse.json(updatedPokemon);
 
   } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002' && error.meta?.target === 'Pokemon_name_key') { // unique constraint on name
+      if (error.code === 'P2002' && error.meta?.target === 'Pokemon_name_key') { 
         return NextResponse.json({ message: 'a pokemon with this name already exists' }, { status: 409 });
       }
-      if (error.code === 'P2025') { // record to update not found
+      if (error.code === 'P2025') { 
         return NextResponse.json({ message: 'pokemon not found' }, { status: 404 });
       }
     }
@@ -64,4 +56,3 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
   }
 }
 
-// We will add DELETE handler here later 

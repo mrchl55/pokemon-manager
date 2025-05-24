@@ -123,6 +123,45 @@ export class PokemonService {
       throw error; // re-throw the error to be handled by the route
     }
   }
+
+  async updatePokemon(id: number, data: { name?: string; height?: number; weight?: number; image?: string | null }) {
+    try {
+      const pokemonToUpdate = await prisma.pokemon.findUnique({ where: { id } });
+      if (!pokemonToUpdate) {
+        return null; 
+      }
+
+      const updateData: Prisma.PokemonUpdateInput = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.height !== undefined) updateData.height = data.height;
+      if (data.weight !== undefined) updateData.weight = data.weight;
+      if (data.image !== undefined) updateData.image = data.image; 
+
+      if (Object.keys(updateData).length === 0) {
+     
+        return pokemonToUpdate; 
+      }
+      
+      const updatedPokemon = await prisma.pokemon.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          height: true,
+          weight: true,
+          image: true,
+          createdAt: true,
+          updatedAt: true,
+        }
+      });
+      return updatedPokemon;
+    } catch (error) {
+      // specific errors like P2002 (unique constraint) will be caught by route handler
+      console.error(`error updating pokemon with id ${id} in service:`, error);
+      throw error; // re-throw
+    }
+  }
 }
 
 export const pokemonService = new PokemonService(); 

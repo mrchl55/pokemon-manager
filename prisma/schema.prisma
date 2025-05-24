@@ -21,9 +21,10 @@ model Pokemon {
   image     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // createdById String?
-  // createdBy   User?   @relation(fields: [createdById], references: [id])
+  @@index([userId]) 
 }
 
 model Account {
@@ -65,7 +66,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // createdPokemons Pokemon[]
+  pokemons      Pokemon[] @relation
 }
 
 model VerificationToken {

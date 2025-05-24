@@ -15,7 +15,7 @@ export interface PokemonFilters {
 }
 
 export interface PaginatedPokemonResponse {
-  data: Pick<Pokemon, 'name' | 'height' | 'weight' | 'image'>[];
+  data: Pick<Pokemon, 'id' | 'name' | 'height' | 'weight' | 'image' | 'userId'>[];
   totalItems: number;
   currentPage: number;
   totalPages: number;
@@ -66,10 +66,12 @@ export class PokemonService {
           skip: offset,
           take: pageSize,
           select: {
+            id: true,
             name: true,
             height: true,
             weight: true,
             image: true,
+            userId: true,
           },
           where: where,
           orderBy: orderBy, 
@@ -80,7 +82,7 @@ export class PokemonService {
       const totalPages = Math.ceil(totalItems / pageSize);
 
       return {
-        data: pokemons,
+        data: pokemons as Pick<Pokemon, 'id' | 'name' | 'height' | 'weight' | 'image' | 'userId'>[],
         totalItems,
         currentPage,
         totalPages,
@@ -92,7 +94,29 @@ export class PokemonService {
     }
   }
 
-  async createPokemon(data: { name: string; height: number; weight: number; image?: string | null }) {
+  async getPokemonById(id: number): Promise<Pokemon | null> {
+    try {
+      const pokemon = await prisma.pokemon.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          height: true,
+          weight: true,
+          image: true,
+          createdAt: true, 
+          updatedAt: true,
+          userId: true,
+        }
+      });
+      return pokemon;
+    } catch (error) {
+      console.error(`Error fetching pokemon with id ${id} in service:`, error);
+      throw new Error(`Failed to fetch pokemon with id ${id}`);
+    }
+  }
+
+  async createPokemon(data: { name: string; height: number; weight: number; image?: string | null; userId: string }) {
     // additional validation could be done here if needed
     try {
       const newPokemon = await prisma.pokemon.create({
@@ -101,6 +125,7 @@ export class PokemonService {
           height: data.height,
           weight: data.weight,
           image: data.image || null, 
+          userId: data.userId,
         },
         select: { // select the fields to return
           id: true,
@@ -110,6 +135,7 @@ export class PokemonService {
           image: true,
           createdAt: true,
           updatedAt: true,
+          userId: true,
         }
       });
       return newPokemon;
@@ -120,28 +146,42 @@ export class PokemonService {
     }
   }
 
-  async updatePokemon(id: number, data: { name?: string; height?: number; weight?: number; image?: string | null }) {
+  async updatePokemon(id: number, data: { name?: string; height?: number; weight?: number; image?: string | null }, currentUserId: string): Promise<Pokemon | null | { error: string, status: number }> {
     try {
-      const pokemonToUpdate = await prisma.pokemon.findUnique({ where: { id } });
+      const pokemonToUpdate = await prisma.pokemon.findUnique({ 
+        where: { id },
+        select: { userId: true, name: true, height: true, weight: true, image: true, id: true, createdAt:true, updatedAt:true } // Select userId to check ownership
+      });
+
       if (!pokemonToUpdate) {
-        return null; 
+        return { error: 'Pokemon not found', status: 404 };
+      }
+
+      if (pokemonToUpdate.userId === null) {
+        return { error: 'Seeded Pokemon cannot be updated', status: 403 }; // Forbidden
+      }
+
+      if (pokemonToUpdate.userId !== currentUserId) {
+        return { error: 'User not authorized to update this Pokemon', status: 403 }; // Forbidden
       }
 
       const updateData: Prisma.PokemonUpdateInput = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.height !== undefined) updateData.height = data.height;
       if (data.weight !== undefined) updateData.weight = data.weight;
+      // Ensure image can be set to null explicitly
       if (data.image !== undefined) updateData.image = data.image; 
 
       if (Object.keys(updateData).length === 0) {
-     
-        return pokemonToUpdate; 
+        // No actual data changes provided, return current pokemon data
+        // This might be debatable, could also be a 400 error
+        return pokemonToUpdate as Pokemon;
       }
       
       const updatedPokemon = await prisma.pokemon.update({
         where: { id },
         data: updateData,
-        select: {
+        select: { // Ensure all relevant fields are returned
           id: true,
           name: true,
           height: true,
@@ -149,31 +189,51 @@ export class PokemonService {
           image: true,
           createdAt: true,
           updatedAt: true,
+          userId: true,
         }
       });
       return updatedPokemon;
     } catch (error) {
-      // specific errors like P2002 (unique constraint) will be caught by route handler
-      console.error(`error updating pokemon with id ${id} in service:`, error);
-      throw error; // re-throw
+      console.error(`Error updating pokemon with id ${id} in service:`, error);
+      // Re-throw to be handled by the route, or return a generic error object
+      // throw error; 
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return { error: 'A Pokemon with this name already exists', status: 409 };
+      }
+      return { error: 'Failed to update pokemon', status: 500 };
     }
   }
 
-  async deletePokemon(id: number): Promise<boolean> {
+  async deletePokemon(id: number, currentUserId: string): Promise<{ success: boolean; error?: string; status?: number }> {
     try {
- 
-      // alternatively, we can findUnique first if we want to return a more specific boolean/object.
+      const pokemonToDelete = await prisma.pokemon.findUnique({
+        where: { id },
+        select: { userId: true } // Only need userId for this check
+      });
+
+      if (!pokemonToDelete) {
+        return { success: false, error: 'Pokemon not found', status: 404 };
+      }
+
+      if (pokemonToDelete.userId === null) {
+        return { success: false, error: 'Seeded Pokemon cannot be deleted', status: 403 };
+      }
+
+      if (pokemonToDelete.userId !== currentUserId) {
+        return { success: false, error: 'User not authorized to delete this Pokemon', status: 403 };
+      }
+
       await prisma.pokemon.delete({
         where: { id },
       });
-      return true; // successfully deleted
+      return { success: true };
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        console.warn(`pokemon with id ${id} not found for deletion.`);
-        return false; 
+        console.warn(`Pokemon with id ${id} not found for deletion (P2025).`);
+        return { success: false, error: 'Pokemon not found', status: 404 };
       }
-      console.error(`error deleting pokemon with id ${id} in service:`, error);
-      throw error; // re-throw other errors
+      console.error(`Error deleting pokemon with id ${id} in service:`, error);
+      return { success: false, error: 'Failed to delete pokemon', status: 500 };
     }
   }
 }

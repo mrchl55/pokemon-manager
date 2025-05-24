@@ -4,9 +4,10 @@ import * as React from 'react';
 import {
   Container, Typography, Grid, Paper, TextField,
   Select, MenuItem, FormControl, InputLabel, Box, CircularProgress, Alert, Pagination, Card, CardContent, CardMedia,
-  Button,
+  Button, CardActions,
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import useDebounce from '@/hooks/useDebounce';
 import { useRouter } from 'next/navigation';
@@ -17,6 +18,7 @@ interface Pokemon {
   height: number;
   weight: number;
   image?: string | null;
+  userId?: string | null;
 }
 
 interface PaginatedPokemonResponse {
@@ -59,6 +61,11 @@ const fetchPokemons = async (
 export default function PokemonSearchPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [openDeleteDialog, setOpenDeleteDialog] = React.useState(false);
+  const [selectedPokemonId, setSelectedPokemonId] = React.useState<number | null>(null);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(10);
@@ -97,6 +104,48 @@ export default function PokemonSearchPage() {
   const handleLimitChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     setLimit(event.target.value as number);
     setPage(1);
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/pokemon/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        if (response.status === 204) return;
+        const errorData = await response.json().catch(() => ({ message: 'Failed to delete Pokemon and parse error response.' }));
+        throw new Error(errorData.message || `Failed to delete Pokemon (status: ${response.status})`);
+      }
+      if (response.status === 204) return; 
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pokemons'] });
+      setOpenDeleteDialog(false);
+      setSelectedPokemonId(null);
+      setDeleteError(null);
+    },
+    onError: (error: Error) => {
+      console.error("Delete error:", error);
+      setDeleteError(error.message || "Could not delete the Pokemon.");
+    },
+  });
+
+  const handleDeleteClick = (id: number) => {
+    setSelectedPokemonId(id);
+    setDeleteError(null);
+    setOpenDeleteDialog(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (deleteMutation.isPending) return;
+    setOpenDeleteDialog(false);
+    setSelectedPokemonId(null);
+    setDeleteError(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (selectedPokemonId) {
+      deleteMutation.mutate(selectedPokemonId);
+    }
   };
 
   return (
@@ -195,6 +244,23 @@ export default function PokemonSearchPage() {
                       Weight: {pokemon.weight}
                     </Typography>
                   </CardContent>
+                  {session?.user?.id === pokemon.userId && pokemon.userId !== null && (
+                    <CardActions>
+                      <Button 
+                        size="small" 
+                        color="primary" 
+                        onClick={() => router.push(`/pokemon/edit/${pokemon.id}`)}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        size="small" 
+                        onClick={() => handleDeleteClick(pokemon.id)}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
+                  )}
                 </Card>
               </Grid>
             ))}
@@ -225,6 +291,33 @@ export default function PokemonSearchPage() {
           </Box>
         </>
       )}
+
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleCloseDeleteDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete this Pokemon? This action cannot be undone.
+          </DialogContentText>
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={deleteMutation.isPending}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" autoFocus disabled={deleteMutation.isPending}>
+            {deleteMutation.isPending ? <CircularProgress size={20} color="inherit" /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

@@ -23,7 +23,7 @@ export default function PokemonImagePanel({ imageUrl, pokemonName }: PokemonImag
       minHeight: { xs: 200, sm: 280 } 
     }}>
       {imageUrl ? (
-        <Image src={imageUrl} alt={pokemonName} width={280} height={280} style={{ objectFit: 'contain' }} />
+        <Image src={imageUrl} alt={pokemonName} width={280} height={280} style={{ objectFit: 'contain' }} priority />
       ) : (
         <Box sx={{textAlign: 'center', display:'flex', alignItems:'center', justifyContent:'center', width: '100%', height: '100%', minHeight: 280, color: '#6B7280'}}>
           <QuestionMarkIcon sx={{ fontSize: { xs: 150, sm: 200 } }} />

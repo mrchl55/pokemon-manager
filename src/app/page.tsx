@@ -2,10 +2,10 @@
 
 import React from 'react';
 import {
-  Container, Typography, CircularProgress, AppBar, Toolbar, Button, Box, Alert, Snackbar
+  Container, Typography, CircularProgress, Box, Alert, Snackbar, Button
 } from '@mui/material';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import useDebounce from '@/hooks/useDebounce';
 import { useRouter } from 'next/navigation';
 
@@ -53,7 +53,6 @@ export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const loadingAuth = status === 'loading';
 
   const [openDeleteDialog, setOpenDeleteDialog] = React.useState(false);
   const [selectedPokemonId, setSelectedPokemonId] = React.useState<number | null>(null);
@@ -154,42 +153,6 @@ export default function HomePage() {
 
   return (
     <>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Pokemon Manager
-          </Typography>
-          {loadingAuth ? (
-            <CircularProgress color="inherit" size={24} />
-          ) : session?.user ? (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Typography sx={{ mr: 2 }}>
-                {session.user.name || session.user.email}
-              </Typography>
-              <Button color="inherit" onClick={() => signOut()}>
-                Sign Out
-              </Button>
-            </Box>
-          ) : (
-            <Box>
-              <Button 
-                color="inherit" 
-                onClick={() => router.push('/auth/login')}
-              >
-                Sign In
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => router.push('/auth/register')}
-                sx={{ ml: 1 }}
-              >
-                Register
-              </Button>
-            </Box>
-          )}
-        </Toolbar>
-      </AppBar>
-      
       <Container sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: (session ? 2 : 4) }}>
           <Typography variant="h4" component="h1">

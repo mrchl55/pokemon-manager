@@ -27,7 +27,6 @@ const fetchPokeApiData = async (pokemonNameOrId: string | number): Promise<PokeA
     
     const pokeApiPokemon = pokemonResponse.data;
     const pokeApiSpecies = speciesResponse.data;
-console.log(pokeApiPokemon)
 
     const PREFERRED_GAME_VERSIONS_FOR_DESCRIPTION = ['scarlet', 'violet', 'sword', 'shield', 'sun', 'moon', 'ultra-sun', 'ultra-moon', 'lets-go-pikachu', 'lets-go-eevee', 'x', 'y', 'omega-ruby', 'alpha-sapphire'];
 

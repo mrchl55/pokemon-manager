@@ -2,9 +2,13 @@
 
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Container, Typography, CircularProgress, Alert, Paper, Grid, Box, Chip, Button } from '@mui/material';
+import { Container, Typography, CircularProgress, Alert, Paper, Grid, Box, Chip, Button, IconButton } from '@mui/material';
 import Image from 'next/image';
+import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 interface LocalPokemonData {
   id: number;
@@ -27,7 +31,7 @@ interface PokeApiStat {
   base_stat: number;
 }
 
-interface PokeApiDetails {
+interface PokeApiDetailsType {
   pokedexId?: number;
   description?: string;
   category?: string;
@@ -38,7 +42,12 @@ interface PokeApiDetails {
 }
 
 interface CombinedPokemonDetails extends LocalPokemonData {
-  pokeApiDetails: PokeApiDetails | null;
+  pokeApiDetails: PokeApiDetailsType | null;
+}
+
+interface NavPokemon {
+  id: number;
+  name: string;
 }
 
 const fetchPokemonDetails = async (dbId: number): Promise<CombinedPokemonDetails> => {
@@ -46,6 +55,14 @@ const fetchPokemonDetails = async (dbId: number): Promise<CombinedPokemonDetails
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: 'Error fetching details and parsing error response.'}));
     throw new Error(errorData.message || `Failed to fetch Pokemon details (status: ${response.status})`);
+  }
+  return response.json();
+};
+
+const fetchNavList = async (): Promise<NavPokemon[]> => {
+  const response = await fetch('/api/pokemon/list-for-nav');
+  if (!response.ok) {
+    throw new Error('Failed to fetch navigation list');
   }
   return response.json();
 };
@@ -78,13 +95,42 @@ export default function PokemonDetailPage() {
   const router = useRouter();
   const dbId = Number(params.id);
 
-  const { data: pokemonDetails, isLoading, error, isError } = useQuery<CombinedPokemonDetails, Error>({
+  const { 
+    data: pokemonDetails, 
+    isLoading: isLoadingDetails, 
+    error: detailsError, 
+    isError: isDetailsError 
+  } = useQuery<CombinedPokemonDetails, Error>({
     queryKey: ['pokemonDetails', dbId],
     queryFn: () => fetchPokemonDetails(dbId),
     enabled: !isNaN(dbId) && dbId > 0,
   });
 
-  if (isLoading) {
+  const { 
+    data: navList, 
+    isLoading: isLoadingNav, 
+  } = useQuery<NavPokemon[], Error>({
+    queryKey: ['pokemonNavList'],
+    queryFn: fetchNavList,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  let prevPokemon: NavPokemon | undefined = undefined;
+  let nextPokemon: NavPokemon | undefined = undefined;
+
+  if (pokemonDetails && navList) {
+    const currentIndex = navList.findIndex(p => p.id === pokemonDetails.id);
+    if (currentIndex !== -1) {
+      if (currentIndex > 0) {
+        prevPokemon = navList[currentIndex - 1];
+      }
+      if (currentIndex < navList.length - 1) {
+        nextPokemon = navList[currentIndex + 1];
+      }
+    }
+  }
+
+  if (isLoadingDetails || isLoadingNav) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
@@ -92,11 +138,11 @@ export default function PokemonDetailPage() {
     );
   }
 
-  if (isError || !pokemonDetails) {
+  if (isDetailsError || !pokemonDetails) {
     return (
       <Container sx={{ mt: 4 }}>
         <Alert severity="error">
-          {error?.message || 'Could not load Pokemon details. The Pokemon may not exist or an error occurred.'}
+          {detailsError?.message || 'Could not load Pokemon details. The Pokemon may not exist or an error occurred.'}
         </Alert>
         <Button onClick={() => router.push('/pokemon/search')} sx={{ mt: 2 }}>
           Back to Search
@@ -109,7 +155,51 @@ export default function PokemonDetailPage() {
   const { pokedexId, description, category, types, abilities, stats, gender } = pokeApiDetails || {};
 
   return (
-    <Container sx={{ mt: 4, mb: 4 }}>
+    <Container sx={{ mt: 2, mb: 4 }}>
+      {/* Navigation Bar */}
+      <Paper 
+        elevation={2} 
+        sx={{
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          p: 1, 
+          mb: 3, 
+          backgroundColor: 'grey.200', 
+          borderRadius: '8px' 
+        }}
+      >
+        {prevPokemon ? (
+          <Link href={`/pokemon/${prevPokemon.id}`} passHref legacyBehavior>
+            <Button 
+              component="a" 
+              startIcon={<ArrowBackIosNewIcon fontSize="small" />} 
+              sx={{textTransform: 'none', color: 'text.primary'}}
+            >
+              <Box sx={{display: 'flex', flexDirection:'column', alignItems:'start'}}>
+                <Typography variant="caption" sx={{color: 'text.secondary'}}>#{String(prevPokemon.id).padStart(4, '0')}</Typography>
+                <Typography variant="body2" sx={{fontWeight:'medium'}}>{prevPokemon.name}</Typography>
+              </Box>
+            </Button>
+          </Link>
+        ) : <Box sx={{width: 'fit-content', visibility: 'hidden'}}><Button startIcon={<ArrowBackIosNewIcon />}>Placeholder</Button></Box> }
+
+        {nextPokemon ? (
+          <Link href={`/pokemon/${nextPokemon.id}`} passHref legacyBehavior>
+            <Button 
+              component="a" 
+              endIcon={<ArrowForwardIosIcon fontSize="small"/>} 
+              sx={{textTransform: 'none', color: 'text.primary'}}
+            >
+              <Box sx={{display: 'flex', flexDirection:'column', alignItems:'end'}}>
+                <Typography variant="caption" sx={{color: 'text.secondary'}}>#{String(nextPokemon.id).padStart(4, '0')}</Typography>
+                <Typography variant="body2" sx={{fontWeight:'medium'}}>{nextPokemon.name}</Typography>
+              </Box>
+            </Button>
+          </Link>
+        ) : <Box sx={{width: 'fit-content', visibility: 'hidden'}}><Button endIcon={<ArrowForwardIosIcon />}>Placeholder</Button></Box>}
+      </Paper>
+
       <Paper elevation={3} sx={{ p: 3, borderRadius: '12px' }}>
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 5}} sx={{display: 'flex', alignItems:'stretch'}}>
@@ -126,7 +216,7 @@ export default function PokemonDetailPage() {
                 <Image src={image} alt={name} width={280} height={280} style={{ objectFit: 'contain' }} />
             ) : (
               <Box sx={{textAlign: 'center', display:'flex', alignItems:'center', justifyContent:'center', minHeight: 280, color: '#6B7280'}}>
-                No image available.
+                <QuestionMarkIcon sx={{ fontSize: 200 }} />
               </Box>
             )}
             </Box>
@@ -167,7 +257,7 @@ export default function PokemonDetailPage() {
                         <Typography variant="body2">{gender}</Typography>
                     </Grid>
                 )}
-                {abilities && abilities.length > 0 && (
+                 {abilities && abilities.length > 0 && (
                   <Grid size={{xs: 12}} sx={{mt: 1}}>
                     <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Abilities</Typography>
                     <Box component="div">

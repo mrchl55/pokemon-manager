@@ -7,6 +7,7 @@ import {
   Button, CardActions,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
 } from '@mui/material';
+import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import useDebounce from '@/hooks/useDebounce';
@@ -224,7 +225,7 @@ export default function PokemonSearchPage() {
             {data.data.map((pokemon) => (
               <Grid key={pokemon.id} size={{xs: 12, sm: 6, md: 4, lg: 3}}>
                 <Card>
-                  {pokemon.image && (
+                  {pokemon.image ? (
                     <CardMedia
                       component="img"
                       height="140"
@@ -232,7 +233,7 @@ export default function PokemonSearchPage() {
                       alt={pokemon.name}
                       sx={{ objectFit: 'contain', pt: 1}} 
                     />
-                  )}
+                  ) : <QuestionMarkIcon sx={{ fontSize: 200, display: 'flex', margin: 'auto', color: 'text.secondary' }} />}
                   <CardContent>
                     <Typography gutterBottom variant="h5" component="div">
                       {pokemon.name}

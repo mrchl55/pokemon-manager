@@ -236,6 +236,24 @@ export class PokemonService {
       return { success: false, error: 'Failed to delete pokemon', status: 500 };
     }
   }
+
+  async getPokemonIdNameList(): Promise<{ id: number; name: string }[]> {
+    try {
+      const pokemonList = await prisma.pokemon.findMany({
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: {
+          id: 'asc',
+        },
+      });
+      return pokemonList;
+    } catch (error) {
+      console.error('Error fetching Pokemon ID/Name list in service:', error);
+      throw new Error('Failed to fetch Pokemon list for navigation');
+    }
+  }
 }
 
 export const pokemonService = new PokemonService(); 

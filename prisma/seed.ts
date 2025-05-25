@@ -22,7 +22,7 @@ interface PokemonDetail {
 async function main() {
   console.log('Start seeding ...');
 
-  const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=50');
+  const response = await fetch('https://pokeapi.co/api/v2/pokemon?limit=100');
   if (!response.ok) {
     console.error('Failed to fetch initial Pokemon list from PokeAPI');
     return;

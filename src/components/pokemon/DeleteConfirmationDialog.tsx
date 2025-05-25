@@ -10,7 +10,7 @@ interface DeleteConfirmationDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   isPending: boolean;
-  error?: string | null;
+  error: Error | null;
   pokemonName?: string; 
 }
 
@@ -28,7 +28,7 @@ export default function DeleteConfirmationDialog({
       <DialogContent>
         <DialogContentText>
           Are you sure you want to delete {pokemonName}? This action cannot be undone.
-          {error && <Alert severity="error" sx={{mt:2}}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{mt:2}}>{error.message}</Alert>}
         </DialogContentText>
       </DialogContent>
       <DialogActions>

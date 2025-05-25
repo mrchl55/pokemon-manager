@@ -227,7 +227,7 @@ export class PokemonService {
         where: { id },
       });
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         console.warn(`Pokemon with id ${id} not found for deletion (P2025).`);
         return { success: false, error: 'Pokemon not found', status: 404 };

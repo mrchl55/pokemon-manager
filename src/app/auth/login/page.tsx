@@ -5,6 +5,7 @@ import { Container, Typography, TextField, Button, Paper, Box, CircularProgress,
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import NextLink from 'next/link';
+import { useState } from 'react';
 
 
 export default function LoginPage() {
@@ -12,10 +13,10 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
 
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [error, setError] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const callbackUrl = searchParams.get('callbackUrl') || '/';
 
@@ -50,8 +51,8 @@ export default function LoginPage() {
       } else {
         setError('An unknown error occurred during login.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }

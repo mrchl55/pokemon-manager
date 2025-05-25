@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import {
-  Grid, Typography, CircularProgress, Alert, Box, Pagination
+  Grid, Typography, CircularProgress, Alert, Pagination
 } from '@mui/material';
 import PokemonCard from './PokemonCard'; 
 import { Session } from 'next-auth';

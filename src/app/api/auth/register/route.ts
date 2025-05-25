@@ -40,8 +40,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: 'user registered successfully', user }, { status: 201 });
 
-  } catch (error: any) {
-    if (error.message === 'password must be at least 6 characters long') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'password must be at least 6 characters long') {
         return NextResponse.json({ message: error.message }, { status: 400 });
     }
     console.error('registration error:', error);

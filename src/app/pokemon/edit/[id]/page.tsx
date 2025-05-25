@@ -57,12 +57,12 @@ export default function EditPokemonPage() {
   const [weight, setWeight] = React.useState('');
   const [image, setImage] = React.useState('');
   const [formError, setFormError] = React.useState<string | null>(null);
-  const [isAuthorized, setIsAuthorized] = React.useState<boolean | null>(null); // null = checking, true = authorized, false = not
+  const [isAuthorized, setIsAuthorized] = React.useState<boolean | null>(null); 
 
   const { data: pokemon, isLoading: isLoadingPokemon, error: fetchError } = useQuery<PokemonData, Error, PokemonData> ({
     queryKey: ['pokemon', pokemonId],
     queryFn: () => fetchPokemonById(pokemonId),
-    enabled: !!pokemonId && !isNaN(pokemonId) && sessionStatus !== 'loading', // Ensure session is loaded before fetching
+    enabled: !!pokemonId && !isNaN(pokemonId) && sessionStatus !== 'loading', 
   });
 
   React.useEffect(() => {
@@ -73,7 +73,7 @@ export default function EditPokemonPage() {
       } else if (pokemon.userId !== session.user.id) {
         setFormError('You are not authorized to edit this Pokemon.');
         setIsAuthorized(false);
-        // Optionally redirect: router.replace('/pokemon/search');
+         router.replace('/pokemon/search');
       } else {
         setName(pokemon.name);
         setHeight(pokemon.height.toString());
@@ -82,13 +82,12 @@ export default function EditPokemonPage() {
         setIsAuthorized(true);
       }
     } else if (!isLoadingPokemon && pokemon === null && sessionStatus === 'authenticated') {
-        // if pokemon is null after loading and user is authenticated (means pokemon not found for this ID)
         setFormError('Pokemon not found.');
         setIsAuthorized(false);
     }
   }, [pokemon, session, sessionStatus, isLoadingPokemon, router]);
 
-  const mutation = useMutation<any, Error, Partial<Omit<PokemonData, 'id' | 'userId'>>>({ // Exclude userId from mutation data
+  const mutation = useMutation<PokemonData, Error, Partial<Omit<PokemonData, 'id' | 'userId'>>>({ // Exclude userId from mutation data
     mutationFn: (updatedData: Partial<Omit<PokemonData, 'id' | 'userId'>>) => updatePokemon({ id: pokemonId, pokemonData: updatedData }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pokemons'] });
@@ -175,13 +174,12 @@ export default function EditPokemonPage() {
           Edit Pokemon: {pokemon?.name || ''}
         </Typography>
         <Box component="form" onSubmit={handleSubmit} noValidate>
-          {/* Form fields, consider disabling them if !isAuthorized as an extra precaution although the form won't be rendered */}
           <TextField margin="normal" required fullWidth id="name" label="Name" value={name} onChange={(e) => setName(e.target.value)} error={!!formError && !name} />
           <TextField margin="normal" required fullWidth id="height" label="Height" type="number" value={height} onChange={(e) => setHeight(e.target.value)} error={!!formError && (!height || isNaN(Number(height)))} />
           <TextField margin="normal" required fullWidth id="weight" label="Weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} error={!!formError && (!weight || isNaN(Number(weight)))} />
           <TextField margin="normal" fullWidth id="image" label="Image URL" value={image} onChange={(e) => setImage(e.target.value)} />
           
-          {(mutation.isError || (formError && !isAuthorized)) && ( // Show form-specific errors if authorized, otherwise the main error alert handles it
+          {(mutation.isError || (formError && !isAuthorized)) && ( 
             <Alert severity="error" sx={{ mt: 2 }}>
               {formError || mutation.error?.message || 'An unexpected error occurred.'}
             </Alert>

@@ -1,34 +1,23 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import {
-  Container, Typography, Grid, Paper, Box, CircularProgress, Alert, Pagination, Button, AppBar, Toolbar
+  Container, Typography, CircularProgress, AppBar, Toolbar, Button, Box, Alert, Snackbar
 } from '@mui/material';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSession, signOut } from 'next-auth/react';
 import useDebounce from '@/hooks/useDebounce';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 import PokemonFilterBar from '@/components/pokemon/PokemonFilterBar';
 import PokemonGridDisplay from '@/components/pokemon/PokemonGridDisplay';
 import DeleteConfirmationDialog from '@/components/pokemon/DeleteConfirmationDialog';
+import { PaginatedPokemonResponse } from '@/types/pokemon';
 
-interface Pokemon {
-  id: number;
-  name: string;
-  height: number;
-  weight: number;
-  image?: string | null;
-  userId?: string | null;
-}
-
-interface PaginatedPokemonResponse {
-  data: Pokemon[];
-  totalItems: number;
-  currentPage: number;
-  totalPages: number;
-  pageSize: number;
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'info' | 'warning';
 }
 
 const fetchPokemons = async (
@@ -36,7 +25,7 @@ const fetchPokemons = async (
   limit: number,
   sortBy: string,
   sortOrder: 'asc' | 'desc',
-  filters: any
+  filters: Record<string, string | number | boolean>
 ): Promise<PaginatedPokemonResponse> => {
   const queryParams = new URLSearchParams({
     page: page.toString(),
@@ -69,7 +58,6 @@ export default function HomePage() {
   const [openDeleteDialog, setOpenDeleteDialog] = React.useState(false);
   const [selectedPokemonId, setSelectedPokemonId] = React.useState<number | null>(null);
   const [selectedPokemonName, setSelectedPokemonName] = React.useState<string | undefined>(undefined);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(10);
@@ -81,6 +69,8 @@ export default function HomePage() {
   const [maxHeightFilter, setMaxHeightFilter] = React.useState('');
   const [minWeightFilter, setMinWeightFilter] = React.useState('');
   const [maxWeightFilter, setMaxWeightFilter] = React.useState('');
+
+  const [snackbar, setSnackbar] = React.useState<SnackbarState | null>(null);
 
   const debouncedNameFilter = useDebounce(nameFilter, 500);
   const debouncedMinHeightFilter = useDebounce(minHeightFilter, 500);
@@ -114,33 +104,31 @@ export default function HomePage() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/pokemon/${id}`, { method: 'DELETE' });
+    mutationFn: async (pokemonId: number) => {
+      const response = await fetch(`/api/pokemon/${pokemonId}`, {
+        method: 'DELETE',
+      });
       if (!response.ok) {
-        if (response.status === 204) return; 
-        const errorData = await response.json().catch(() => ({ message: 'Failed to delete Pokemon and parse error response.' }));
-        throw new Error(errorData.message || `Failed to delete Pokemon (status: ${response.status})`);
+        const errorData = await response.json().catch(() => ({ message: 'Failed to delete Pokemon and parse error' }));
+        throw new Error(errorData.message || 'Failed to delete Pokemon');
       }
-      if (response.status === 204) return; 
-      return response.json();
+      return pokemonId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pokemons'] });
+      setSnackbar({ open: true, message: 'Pokemon deleted successfully!', severity: 'success' });
       setOpenDeleteDialog(false);
       setSelectedPokemonId(null);
       setSelectedPokemonName(undefined);
-      setDeleteError(null);
     },
     onError: (error: Error) => {
-      console.error("Delete error:", error);
-      setDeleteError(error.message || "Could not delete the Pokemon.");
+      setSnackbar({ open: true, message: error.message || 'Failed to delete Pokemon', severity: 'error' });
     },
   });
 
   const handleDeleteClick = (id: number, name: string) => {
     setSelectedPokemonId(id);
     setSelectedPokemonName(name);
-    setDeleteError(null);
     setOpenDeleteDialog(true);
   };
 
@@ -149,13 +137,19 @@ export default function HomePage() {
     setOpenDeleteDialog(false);
     setSelectedPokemonId(null);
     setSelectedPokemonName(undefined);
-    setDeleteError(null);
   };
 
   const handleConfirmDelete = () => {
     if (selectedPokemonId) {
       deleteMutation.mutate(selectedPokemonId);
     }
+  };
+
+  const handleCloseSnackbar = (event?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar(null);
   };
 
   return (
@@ -246,9 +240,21 @@ export default function HomePage() {
         onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
         isPending={deleteMutation.isPending}
-        error={deleteError}
+        error={deleteMutation.error}
         pokemonName={selectedPokemonName}
        />
+      {snackbar && (
+        <Snackbar 
+          open={snackbar.open} 
+          autoHideDuration={6000} 
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      )}
     </Container>
     </>
   );

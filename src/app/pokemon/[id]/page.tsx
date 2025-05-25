@@ -1,9 +1,11 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Container, Typography, CircularProgress, Alert, Paper, Grid, Box, Button } from '@mui/material';
+import {
+  Container, CircularProgress, Alert, Paper, Grid, Button
+} from '@mui/material';
 
 import PokemonDetailHeader from '@/components/pokemon/detail/PokemonDetailHeader';
 import PokemonImagePanel from '@/components/pokemon/detail/PokemonImagePanel';
@@ -11,46 +13,8 @@ import PokemonDescription from '@/components/pokemon/detail/PokemonDescription';
 import PokemonInfoPanel from '@/components/pokemon/detail/PokemonInfoPanel';
 import PokemonTypeDisplay from '@/components/pokemon/detail/PokemonTypeDisplay';
 import PokemonStatsChart from '@/components/pokemon/detail/PokemonStatsChart';
+import { CombinedPokemonDetails, NavPokemon } from '@/types/pokemon';
 
-interface LocalPokemonData {
-  id: number;
-  name: string;
-  height: number;
-  weight: number;
-  image?: string | null;
-  userId?: string | null;
-  createdAt: string; 
-  updatedAt: string; 
-}
-
-interface PokeApiAbility {
-  name: string;
-  is_hidden: boolean;
-}
-
-interface PokeApiStat {
-  name: string;
-  base_stat: number;
-}
-
-interface PokeApiDetailsType {
-  pokedexId?: number;
-  description?: string;
-  category?: string;
-  types?: string[];
-  abilities?: PokeApiAbility[];
-  stats?: PokeApiStat[];
-  gender?: string;
-}
-
-interface CombinedPokemonDetails extends LocalPokemonData {
-  pokeApiDetails: PokeApiDetailsType | null;
-}
-
-interface NavPokemon {
-  id: number;
-  name: string;
-}
 
 const fetchPokemonDetails = async (dbId: number): Promise<CombinedPokemonDetails> => {
   const response = await fetch(`/api/pokemon/${dbId}?view=details`);

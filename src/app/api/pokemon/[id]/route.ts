@@ -2,35 +2,67 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { pokemonService } from '@/services/pokemon.service';
-import { Prisma } from '@prisma/client';
 import axios from 'axios';
+import { 
+  FlavorTextEntry, 
+  Genus, 
+  TypeInfo, 
+  AbilityInfo, 
+  StatInfo, 
+  PokeApiSpeciesResponse, 
+  PokeApiPokemonResponse, 
+  PokeApiDetailsType
+} from '@/types/pokemon'; // Import types
 
 interface RouteParams {
   id: string;
 }
 
-const fetchPokeApiData = async (pokemonNameOrId: string | number) => {
+// PokeAPI type definitions moved to @/types/pokemon.ts
+
+const fetchPokeApiData = async (pokemonNameOrId: string | number): Promise<PokeApiDetailsType | null> => {
   try {
-    const pokemonResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon/${pokemonNameOrId.toString().toLowerCase()}`);
-    const speciesResponse = await axios.get(`https://pokeapi.co/api/v2/pokemon-species/${pokemonNameOrId.toString().toLowerCase()}`);
+    const pokemonResponse = await axios.get<PokeApiPokemonResponse>(`https://pokeapi.co/api/v2/pokemon/${pokemonNameOrId.toString().toLowerCase()}`);
+    const speciesResponse = await axios.get<PokeApiSpeciesResponse>(`https://pokeapi.co/api/v2/pokemon-species/${pokemonNameOrId.toString().toLowerCase()}`);
     
     const pokeApiPokemon = pokemonResponse.data;
     const pokeApiSpecies = speciesResponse.data;
+console.log(pokeApiPokemon)
 
-    const description = pokeApiSpecies.flavor_text_entries
-      .find((entry: any) => entry.language.name === 'en')
-      ?.flavor_text.replace(/\f|\n/g, ' ') || 'No description available.';
+    const PREFERRED_GAME_VERSIONS_FOR_DESCRIPTION = ['scarlet', 'violet', 'sword', 'shield', 'sun', 'moon', 'ultra-sun', 'ultra-moon', 'lets-go-pikachu', 'lets-go-eevee', 'x', 'y', 'omega-ruby', 'alpha-sapphire'];
 
+    const englishFlavorTexts = pokeApiSpecies.flavor_text_entries.filter(
+      (entry: FlavorTextEntry) => entry.language.name === 'en'
+    );
+
+    let description = 'No description available.';
+    if (englishFlavorTexts.length > 0) {
+      let foundPreferred = false;
+      for (const version of PREFERRED_GAME_VERSIONS_FOR_DESCRIPTION) {
+        const preferredEntry = englishFlavorTexts.find(
+          (entry: FlavorTextEntry) => entry.version.name === version
+        );
+        if (preferredEntry) {
+          description = preferredEntry.flavor_text.replace(/\f|\n/g, ' ');
+          foundPreferred = true;
+          break;
+        }
+      }
+      if (!foundPreferred) {
+        description = englishFlavorTexts[0].flavor_text.replace(/\f|\n/g, ' ');
+      }
+    }
+    
     const category = pokeApiSpecies.genera
-      .find((genus: any) => genus.language.name === 'en')
+      .find((genus: Genus) => genus.language.name === 'en')
       ?.genus || 'Unknown';
 
-    const types = pokeApiPokemon.types.map((typeInfo: any) => typeInfo.type.name);
-    const abilities = pokeApiPokemon.abilities.map((abilityInfo: any) => ({
+    const types = pokeApiPokemon.types.map((typeInfo: TypeInfo) => typeInfo.type.name);
+    const abilities = pokeApiPokemon.abilities.map((abilityInfo: AbilityInfo) => ({
       name: abilityInfo.ability.name,
       is_hidden: abilityInfo.is_hidden,
     }));
-    const stats = pokeApiPokemon.stats.map((statInfo: any) => ({
+    const stats = pokeApiPokemon.stats.map((statInfo: StatInfo) => ({
       name: statInfo.stat.name,
       base_stat: statInfo.base_stat,
     }));
@@ -132,12 +164,15 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
       return NextResponse.json(result);
     }
     
+    // This case should ideally not be reached if service responses are consistent
     console.error(`API error updating pokemon ${pokemonId}: Unexpected service response`, result);
     return NextResponse.json({ message: 'Error updating pokemon: Unexpected response from service' }, { status: 500 });
 
-  } catch (error: any) {
-    console.error(`API error updating pokemon ${pokemonId}:`, error);
-    return NextResponse.json({ message: 'Error updating pokemon' }, { status: 500 });
+  } catch (e: unknown) { // Changed from error: any to e: unknown for better type safety
+    console.error(`API error updating pokemon ${pokemonId}:`, e);
+    // Explicitly type error as 'Error' or 'unknown' then check properties
+    const message = e instanceof Error ? e.message : 'Error updating pokemon';
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
 
@@ -163,9 +198,11 @@ export async function DELETE(request: Request, { params }: { params: RouteParams
     } else {
       return NextResponse.json({ message: result.error || 'Error deleting pokemon' }, { status: result.status || 500 });
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error(`API error deleting pokemon ${pokemonId}:`, error);
-    return NextResponse.json({ message: 'Error deleting pokemon' }, { status: 500 });
+    // Explicitly type error as 'Error' or 'unknown' then check properties
+    const message = error instanceof Error ? error.message : 'Error deleting pokemon';
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
 

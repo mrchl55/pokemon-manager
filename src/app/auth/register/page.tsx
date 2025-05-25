@@ -4,21 +4,23 @@ import * as React from 'react';
 import { Container, Typography, TextField, Button, Paper, Box, CircularProgress, Alert } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
+import { useState } from 'react';
+import { User } from 'next-auth';
 
 interface RegistrationResponse {
   message?: string;
-  user?: any;
+  user?: User;
 }
 
 export default function RegisterPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
     if (status === 'authenticated') {
@@ -70,8 +72,10 @@ export default function RegisterPage() {
          setSuccess(null);
       }
       
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (e: unknown) {
+      console.error('An unexpected error occurred:', e);
+      const message = e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.';
+      setError(message);
       setSuccess(null);
     } finally {
       setIsLoading(false);

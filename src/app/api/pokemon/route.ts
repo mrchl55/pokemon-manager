@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // Import authOptions
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'; 
 import { pokemonService, PokemonFilters } from '@/services/pokemon.service';
-import { Prisma } from '@prisma/client'; // For potential specific types
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -98,13 +97,9 @@ export async function POST(request: Request) {
     const newPokemon = await pokemonService.createPokemon({ name, height, weight, image: image || null, userId });
     return NextResponse.json(newPokemon, { status: 201 });
 
-  } catch (error: any) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002' && error.meta?.target === 'Pokemon_name_key') {
-        return NextResponse.json({ message: 'A pokemon with this name already exists' }, { status: 409 });
-      }
-    }
-    console.error('API error creating pokemon:', error);
-    return NextResponse.json({ message: 'Error creating pokemon' }, { status: 500 });
+  } catch (e: unknown) {
+    console.error('API Error creating pokemon:', e);
+    const message = e instanceof Error ? e.message : 'Error creating pokemon';
+    return NextResponse.json({ message }, { status: 500 });
   }
 } 

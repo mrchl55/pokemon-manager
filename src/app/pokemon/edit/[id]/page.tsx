@@ -90,16 +90,12 @@ export default function EditPokemonPage() {
         setIsAuthorized(false);
       } else {
         setIsAuthorized(true);
-        if (!name && pokemon.name) setName(pokemon.name); 
-        if (!height && pokemon.height) setHeight(pokemon.height.toString());
-        if (!weight && pokemon.weight) setWeight(pokemon.weight.toString());
-        if (!currentImageUrl && pokemon.image) setCurrentImageUrl(pokemon.image || null);
       }
     } else if (!isLoadingPokemon && sessionStatus === 'authenticated') {
         setFormError('Pokemon not found.');
         setIsAuthorized(false);
     }
-  }, [pokemon, session, sessionStatus, isLoadingPokemon, router, name, height, weight, currentImageUrl]);
+  }, [pokemon, session, sessionStatus, isLoadingPokemon, router]);
 
   const mutation = useMutation<PokemonData, Error, FormData>({ 
     mutationFn: (formData: FormData) => updatePokemonWithUpload({ id: pokemonId, formData }),
@@ -222,7 +218,7 @@ export default function EditPokemonPage() {
           {imagePreview && (
             <Box sx={{ mt: 2, mb:1, textAlign: 'center' }}>
               <Typography variant="subtitle2">New Image Preview:</Typography>
-              <img src={imagePreview} alt="New image preview" style={{ maxWidth: '100%', maxHeight: '150px', marginTop: '8px' }} />
+              <Image src={imagePreview} alt="New image preview" width={150} height={150} style={{ maxWidth: '100%', maxHeight: '150px', marginTop: '8px', objectFit: 'contain' }} />
             </Box>
           )}
 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {
-  Container, Typography, CircularProgress, Box, Alert, Snackbar, Button
+  Container, Typography, Box, Alert, Snackbar, Button
 } from '@mui/material';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
@@ -50,7 +50,7 @@ const fetchPokemons = async (
 };
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const router = useRouter();
   const queryClient = useQueryClient();
 

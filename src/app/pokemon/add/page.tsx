@@ -5,20 +5,13 @@ import { Container, Typography, TextField, Button, Paper, Box, CircularProgress,
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 
-// NewPokemonData now expects a File or null for imageFile
-interface NewPokemonFormData {
-  name: string;
-  height: string; // Keep as string for form input, convert before sending
-  weight: string; // Keep as string for form input, convert before sending
-  imageFile?: File | null; // For the uploaded file
-}
 
 const createPokemonWithUpload = async (formData: FormData) => {
   const response = await fetch('/api/pokemon', {
     method: 'POST',
-    body: formData, // Send FormData directly
-    // 'Content-Type': 'multipart/form-data' is set automatically by browser with FormData
+    body: formData, 
   });
 
   if (!response.ok) {
@@ -44,7 +37,7 @@ export default function AddPokemonPage() {
     mutationFn: createPokemonWithUpload,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pokemons'] });
-      router.push('/'); // Redirect to homepage after successful creation
+      router.push('/'); 
     },
     onError: (error: Error) => {
       setFormError(error.message);
@@ -169,7 +162,7 @@ export default function AddPokemonPage() {
           {imagePreview && (
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Typography variant="subtitle2">Image Preview:</Typography>
-              <img src={imagePreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', marginTop: '8px' }} />
+              <Image src={imagePreview} alt="Preview" width={200} height={200} style={{ objectFit: 'contain', maxWidth: '100%', maxHeight: '200px', marginTop: '8px' }} />
             </Box>
           )}
           {formError && (
@@ -179,7 +172,6 @@ export default function AddPokemonPage() {
           )}
           {mutation.isError && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {/* Make sure mutation.error is an instance of Error before accessing message */}
               {mutation.error instanceof Error ? mutation.error.message : 'An unexpected error occurred.'}
             </Alert>
           )}

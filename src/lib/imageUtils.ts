@@ -12,9 +12,14 @@ export async function deleteUploadedImageIfExists(imagePath: string | null | und
     try {
       await fs.unlink(fullPath);
       console.log(`Deleted image: ${fullPath}`);
-    } catch (unlinkError: any) {
-      if (unlinkError.code !== 'ENOENT') { // Ignore if file doesn't exist, as it might have been deleted already or never existed
-          console.warn(`Could not delete image ${fullPath} (may not exist or permissions issue):`, unlinkError.message);
+    } catch (unlinkError: unknown) {
+      if (typeof unlinkError === 'object' && unlinkError !== null && 'code' in unlinkError) {
+        const errorWithCode = unlinkError as { code: string; message?: string };
+        if (errorWithCode.code !== 'ENOENT') {
+          console.warn(`Could not delete image ${fullPath} (may not exist or permissions issue):`, errorWithCode.message || unlinkError);
+        }
+      } else {
+        console.warn(`Could not delete image ${fullPath} due to an unexpected error:`, unlinkError);
       }
     }
   }

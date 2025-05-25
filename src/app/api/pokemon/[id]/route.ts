@@ -159,9 +159,9 @@ export async function DELETE(request: Request, { params }: { params: RouteParams
     } else {
       return NextResponse.json({ message: result.error || 'Error deleting pokemon' }, { status: result.status || 500 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`API error deleting pokemon ${pokemonId}:`, error);
-    const message = error.message || 'Error deleting pokemon';
+    const message = error instanceof Error ? error.message : 'Error deleting pokemon';
     return NextResponse.json({ message }, { status: 500 });
   }
 }

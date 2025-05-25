@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'email and password are required' }, { status: 400 });
     }
     if (password.length < 6) {
-        throw new Error('password must be at least 6 characters long');
+      return NextResponse.json({ message: 'password must be at least 6 characters long' }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -41,9 +41,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'user registered successfully', user }, { status: 201 });
 
   } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'password must be at least 6 characters long') {
-        return NextResponse.json({ message: error.message }, { status: 400 });
-    }
     console.error('registration error:', error);
     return NextResponse.json({ message: 'error registering user' }, { status: 500 });
   }

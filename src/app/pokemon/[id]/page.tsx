@@ -110,87 +110,101 @@ export default function PokemonDetailPage() {
 
   return (
     <Container sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: '12px' }}>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 5}}>
-            {image && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2, border: '1px solid #eee', borderRadius: 2, minHeight: 300}}>
-                <Image src={image} alt={name} width={250} height={250} style={{ objectFit: 'contain' }} />
-              </Box>
-            )}
-            {!image && 
-              <Box sx={{textAlign: 'center', p:2, border: '1px solid #eee', borderRadius: 2, minHeight: 300, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <Grid size={{ xs: 12, md: 5}} sx={{display: 'flex', alignItems:'stretch'}}>
+            <Box sx={{
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              p: 2, 
+              backgroundColor: '#F3F4F6',
+              borderRadius: '8px', 
+              width: '100%' 
+            }}>
+            {image ? (
+                <Image src={image} alt={name} width={280} height={280} style={{ objectFit: 'contain' }} />
+            ) : (
+              <Box sx={{textAlign: 'center', display:'flex', alignItems:'center', justifyContent:'center', minHeight: 280, color: '#6B7280'}}>
                 No image available.
               </Box>
-            }
+            )}
+            </Box>
           </Grid>
 
           <Grid size={{ xs: 12, md: 7}}>
-            <Typography variant="h3" component="h1" gutterBottom>
-              {name} {pokedexId ? `#${pokedexId.toString().padStart(4, '0')}` : `(Local ID: ${pokemonDetails.id})`}
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 0.5, textAlign: {xs: 'center', md: 'left'} }}>
+              {name} 
+              {pokedexId && 
+                <Typography component="span" variant="h4" sx={{ color: 'text.secondary', fontWeight: 'bold', ml: 1}}>
+                   #{pokedexId.toString().padStart(4, '0')}
+                </Typography>
+              }
             </Typography>
             
-            {description && <Typography variant="body1" sx={{ mb: 2 }}>{description}</Typography>}
-            {!description && pokeApiDetails !== null && <Typography variant="body1" sx={{ mb: 2 }}>No description available for this Pokemon.</Typography>}
+            {description && <Typography variant="body1" sx={{ mb: 2, color:'text.secondary', textAlign: {xs: 'center', md: 'left'} }}>{description}</Typography>}
+            {!description && pokeApiDetails !== null && <Typography variant="body1" sx={{ mb: 2, color:'text.secondary', textAlign: {xs: 'center', md: 'left'} }}>No description available.</Typography>}
 
-            <Grid container spacing={1} sx={{mb: 2}}>
-                <Grid size={{xs:6, sm:4}}>
-                    <Typography variant="subtitle2">Height</Typography>
-                    <Typography variant="body2">
-                        {pokeApiDetails?.types ? `${(pokemonDetails.height / 10).toFixed(1)}m` : `${pokemonDetails.height}cm (local)`}
-                    </Typography> 
+            <Paper sx={{ p: 2, backgroundColor: '#3B82F6', color: 'white', borderRadius: '8px', mb: 2 }} elevation={0}>
+              <Grid container spacing={2}>
+                <Grid size={{xs: 6, sm: 3}}>
+                    <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Height</Typography>
+                    <Typography variant="body2">{pokeApiDetails ? `${(height / 10).toFixed(1)}m` : `${height} (local)`}</Typography> 
                 </Grid>
-                <Grid size={{xs:6, sm:4}}>
-                    <Typography variant="subtitle2">Weight</Typography>
-                    <Typography variant="body2">
-                         {pokeApiDetails?.types ? `${(pokemonDetails.weight / 10).toFixed(1)}kg` : `${pokemonDetails.weight}g (local)`}
-                    </Typography>
+                <Grid size={{xs: 6, sm: 3}}>
+                    <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Weight</Typography>
+                    <Typography variant="body2">{pokeApiDetails ? `${(weight / 10).toFixed(1)}kg` : `${weight} (local)`}</Typography>
                 </Grid>
                 {category && (
-                    <Grid size={{xs:6, sm:4}}>
-                        <Typography variant="subtitle2">Category</Typography>
+                    <Grid size={{xs: 6, sm: 3}}>
+                        <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Category</Typography>
                         <Typography variant="body2">{category}</Typography>
                     </Grid>
                 )}
                 {gender && (
-                     <Grid size={{xs:6, sm:4}}>
-                        <Typography variant="subtitle2">Gender</Typography>
+                     <Grid size={{xs: 6, sm: 3}}>
+                        <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Gender</Typography>
                         <Typography variant="body2">{gender}</Typography>
                     </Grid>
                 )}
-            </Grid>
+                {abilities && abilities.length > 0 && (
+                  <Grid size={{xs: 12}} sx={{mt: 1}}>
+                    <Typography variant="subtitle2" sx={{fontWeight:'bold'}}>Abilities</Typography>
+                    <Box component="div">
+                      {abilities.map(ability => (
+                        <Typography key={ability.name} variant="body2" component="div">
+                          {ability.name.charAt(0).toUpperCase() + ability.name.slice(1)}
+                          {ability.is_hidden ? <Typography component="span" variant="caption" sx={{ ml: 0.5, fontStyle: 'italic' }}>(Hidden)</Typography> : ''}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Grid>
+                )}
+              </Grid>
+            </Paper>
             
-            {abilities && abilities.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="h6">Abilities</Typography>
-                {abilities.map(ability => (
-                  <Chip key={ability.name} label={`${ability.name.charAt(0).toUpperCase() + ability.name.slice(1)}${ability.is_hidden ? ' (Hidden)' : ''}`} sx={{ mr: 1, mb: 1, textTransform: 'capitalize' }} />
-                ))}
-              </Box>
-            )}
-
             {types && types.length > 0 && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="h6">Type</Typography>
+              <Box sx={{ mb: 2, textAlign: {xs: 'center', md: 'left'} }}>
+                <Typography variant="h6" sx={{fontWeight: 'bold', mb:1}}>Type</Typography>
                 {types.map(type => (
-                  <Chip key={type} label={type} sx={{ mr: 1, mb: 1, backgroundColor: getPokemonTypeColor(type), color: 'white', textTransform: 'capitalize' }} />
+                  <Chip key={type} label={type} sx={{ mr: 1, mb: 1, backgroundColor: getPokemonTypeColor(type), color: 'white', textTransform: 'capitalize', borderRadius: '6px' }} />
                 ))}
               </Box>
             )}
           </Grid>
           
           {stats && stats.length > 0 && (
-            <Grid size={{xs:12}} sx={{mt:3}}>
-                <Typography variant="h5" gutterBottom>Stats</Typography>
-                <Paper variant="outlined" sx={{p:2}}>
-                    <Grid container spacing={1} alignItems="flex-end">
+            <Grid size={{xs:12}} sx={{mt:2}}>
+                <Typography variant="h5" gutterBottom sx={{fontWeight: 'bold', textAlign: {xs: 'center', md: 'left'} }}>Stats</Typography>
+                <Paper variant="outlined" sx={{p:2, backgroundColor: '#E5E7EB', borderRadius:'8px'}}>
+                    <Grid container spacing={{xs: 1, sm: 2}}>
                         {stats.map(stat => (
                             <Grid key={stat.name} size={{xs:6, sm:4, md:2}} sx={{textAlign: 'center'}}>
-                                <Typography variant="h6">{stat.base_stat}</Typography>
-                                <Box sx={{ width: '80%', margin: 'auto', backgroundColor: '#e0e0e0', borderRadius: 1, overflow: 'hidden', height: 10, mt: 0.5 }}>
-                                    <Box sx={{ width: `${(stat.base_stat / 255) * 100}%`, backgroundColor: getStatColor(stat.name), height: '100%' }} />
+                                <Typography variant="subtitle1" sx={{fontWeight:'bold'}}>{stat.base_stat}</Typography>
+                                <Box sx={{ width: '80%', margin: 'auto', backgroundColor: '#9CA3AF', borderRadius: '4px', overflow: 'hidden', height: 8, mt: 0.5, mb:0.5 }}>
+                                    <Box sx={{ width: `${Math.min((stat.base_stat / 180) * 100, 100)}%`, backgroundColor: '#60A5FA', height: '100%' }} />
                                 </Box>
-                                <Typography variant="caption" sx={{textTransform: 'capitalize', display:'block', mt:0.5}}>{stat.name.replace('-', ' ' )}</Typography>
+                                <Typography variant="caption" sx={{textTransform: 'capitalize', display:'block'}}>{stat.name.replace('-', ' ' )}</Typography>
                             </Grid>
                         ))}
                     </Grid>

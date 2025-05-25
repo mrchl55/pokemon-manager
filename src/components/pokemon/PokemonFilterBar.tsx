@@ -38,7 +38,7 @@ export default function PokemonFilterBar({
     <Paper sx={{ p: 2, mb: 3 }}>
       <Typography variant="h6">Filters & Sorting</Typography>
       <Grid container spacing={2} sx={{ mt: 1 }}>
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
           <TextField 
             fullWidth 
             label="Filter by Name" 
@@ -48,7 +48,7 @@ export default function PokemonFilterBar({
             size="small" 
           />
         </Grid>
-        <Grid item xs={6} sm={3} md={2}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <TextField 
             fullWidth 
             label="Min Height" 
@@ -60,7 +60,7 @@ export default function PokemonFilterBar({
             InputLabelProps={{ shrink: true }} 
           />
         </Grid>
-        <Grid item xs={6} sm={3} md={2}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <TextField 
             fullWidth 
             label="Max Height" 
@@ -72,7 +72,7 @@ export default function PokemonFilterBar({
             InputLabelProps={{ shrink: true }} 
           />
         </Grid>
-        <Grid item xs={6} sm={3} md={2}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <TextField 
             fullWidth 
             label="Min Weight" 
@@ -84,7 +84,7 @@ export default function PokemonFilterBar({
             InputLabelProps={{ shrink: true }} 
           />
         </Grid>
-        <Grid item xs={6} sm={3} md={2}>
+        <Grid size={{ xs: 6, sm: 3, md: 2 }}>
           <TextField 
             fullWidth 
             label="Max Weight" 
@@ -96,7 +96,7 @@ export default function PokemonFilterBar({
             InputLabelProps={{ shrink: true }} 
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
           <FormControl fullWidth size="small">
             <InputLabel id="sort-by-label">Sort By</InputLabel>
             <Select
@@ -112,7 +112,7 @@ export default function PokemonFilterBar({
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
           <FormControl fullWidth size="small">
             <InputLabel id="sort-order-label">Order</InputLabel>
             <Select
@@ -126,7 +126,7 @@ export default function PokemonFilterBar({
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
           <FormControl fullWidth size="small">
             <InputLabel id="items-per-page-label">Items/Page</InputLabel>
             <Select

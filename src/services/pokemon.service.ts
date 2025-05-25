@@ -117,7 +117,6 @@ export class PokemonService {
   }
 
   async createPokemon(data: { name: string; height: number; weight: number; image?: string | null; userId: string }) {
-    // additional validation could be done here if needed
     try {
       const newPokemon = await prisma.pokemon.create({
         data: {
@@ -127,7 +126,7 @@ export class PokemonService {
           image: data.image || null, 
           userId: data.userId,
         },
-        select: { // select the fields to return
+        select: { 
           id: true,
           name: true,
           height: true,
@@ -146,42 +145,46 @@ export class PokemonService {
     }
   }
 
-  async updatePokemon(id: number, data: { name?: string; height?: number; weight?: number; image?: string | null }, currentUserId: string): Promise<Pokemon | null | { error: string, status: number }> {
+  async updatePokemon(
+    id: number, 
+    data: { name?: string; height?: number; weight?: number; image?: string | null; imageToBeRemoved?: boolean }, 
+    currentUserId: string
+  ): Promise<Pokemon | null | { error: string, status: number }> {
     try {
       const pokemonToUpdate = await prisma.pokemon.findUnique({ 
         where: { id },
-        select: { userId: true, name: true, height: true, weight: true, image: true, id: true, createdAt:true, updatedAt:true } // Select userId to check ownership
+        select: { userId: true, name: true, height: true, weight: true, image: true, id: true, createdAt:true, updatedAt:true } 
       });
 
       if (!pokemonToUpdate) {
         return { error: 'Pokemon not found', status: 404 };
       }
-
       if (pokemonToUpdate.userId === null) {
-        return { error: 'Seeded Pokemon cannot be updated', status: 403 }; // Forbidden
+        return { error: 'Seeded Pokemon cannot be updated', status: 403 };
       }
-
       if (pokemonToUpdate.userId !== currentUserId) {
-        return { error: 'User not authorized to update this Pokemon', status: 403 }; // Forbidden
+        return { error: 'User not authorized to update this Pokemon', status: 403 };
       }
 
       const updateData: Prisma.PokemonUpdateInput = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.height !== undefined) updateData.height = data.height;
       if (data.weight !== undefined) updateData.weight = data.weight;
-      // Ensure image can be set to null explicitly
-      if (data.image !== undefined) updateData.image = data.image; 
+      
+      if (data.image !== undefined) { 
+        updateData.image = data.image; 
+      } else if (data.imageToBeRemoved) { 
+        updateData.image = null;
+      }
 
       if (Object.keys(updateData).length === 0) {
-        // No actual data changes provided, return current pokemon data
-        // This might be debatable, could also be a 400 error
         return pokemonToUpdate as Pokemon;
       }
       
       const updatedPokemon = await prisma.pokemon.update({
         where: { id },
         data: updateData,
-        select: { // Ensure all relevant fields are returned
+        select: { 
           id: true,
           name: true,
           height: true,
@@ -195,12 +198,10 @@ export class PokemonService {
       return updatedPokemon;
     } catch (error) {
       console.error(`Error updating pokemon with id ${id} in service:`, error);
-      // Re-throw to be handled by the route, or return a generic error object
-      // throw error; 
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return { error: 'A Pokemon with this name already exists', status: 409 };
+        return { error: 'A Pokemon with this name already exists.', status: 409 };
       }
-      return { error: 'Failed to update pokemon', status: 500 };
+      return { error: 'Failed to update Pokemon due to a server error.', status: 500 }; 
     }
   }
 
@@ -208,7 +209,7 @@ export class PokemonService {
     try {
       const pokemonToDelete = await prisma.pokemon.findUnique({
         where: { id },
-        select: { userId: true } // Only need userId for this check
+        select: { userId: true } 
       });
 
       if (!pokemonToDelete) {

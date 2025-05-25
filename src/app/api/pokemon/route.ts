@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'; 
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { pokemonService, PokemonFilters } from '@/services/pokemon.service';
+import { Prisma } from '@prisma/client';
+import fs from 'fs/promises';
+import path from 'path';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -75,31 +78,81 @@ export async function GET(request: Request) {
   }
 }
 
+async function streamToBuffer(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+    }
+  }
+  return Buffer.concat(chunks);
+}
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-
   if (!session || !session.user || !session.user.id) {
     return NextResponse.json({ message: 'Unauthorized. Please log in.' }, { status: 401 });
   }
   const userId = session.user.id;
 
   try {
-    const body = await request.json();
-    const { name, height, weight, image } = body as { name: string, height: number, weight: number, image?: string };
+    const formData = await request.formData();
+    const name = formData.get('name') as string;
+    const heightStr = formData.get('height') as string;
+    const weightStr = formData.get('weight') as string;
+    const imageFile = formData.get('image') as File | null;
 
-    if (!name || height === undefined || weight === undefined) {
+    if (!name || !heightStr || !weightStr) {
       return NextResponse.json({ message: 'Name, height, and weight are required' }, { status: 400 });
     }
-    if (typeof height !== 'number' || typeof weight !== 'number') {
-        return NextResponse.json({ message: 'Height and weight must be numbers' }, { status: 400 });
+
+    const height = parseFloat(heightStr);
+    const weight = parseFloat(weightStr);
+
+    if (isNaN(height) || isNaN(weight)) {
+      return NextResponse.json({ message: 'Height and weight must be valid numbers' }, { status: 400 });
     }
 
-    const newPokemon = await pokemonService.createPokemon({ name, height, weight, image: image || null, userId });
-    return NextResponse.json(newPokemon, { status: 201 });
+    let imagePath: string | null = null;
+    if (imageFile && imageFile.size > 0) {
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'pokemon');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      
+      const originalFilename = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '');
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = uniqueSuffix + '-' + originalFilename;
+      const fullFilePath = path.join(uploadsDir, filename);
+      
+      if (!imageFile.stream) {
+        return NextResponse.json({ message: 'Image file stream is not available.' }, { status: 400 });
+      }
+      const buffer = await streamToBuffer(imageFile.stream());
+      await fs.writeFile(fullFilePath, buffer);
+      imagePath = `/uploads/pokemon/${filename}`;
+    }
 
+    const newPokemon = await pokemonService.createPokemon({
+      name,
+      height,
+      weight,
+      image: imagePath,
+      userId,
+    });
+
+    return NextResponse.json(newPokemon, { status: 201 });
   } catch (e: unknown) {
     console.error('API Error creating pokemon:', e);
-    const message = e instanceof Error ? e.message : 'Error creating pokemon';
+    let message = 'Error creating pokemon';
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      message = 'A Pokemon with this name already exists.';
+      return NextResponse.json({ message }, { status: 409 });
+    }
+    if (e instanceof Error) {
+        message = e.message;
+    }
     return NextResponse.json({ message }, { status: 500 });
   }
 } 

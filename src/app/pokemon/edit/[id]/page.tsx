@@ -1,10 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Container, Typography, TextField, Button, Paper, Box, CircularProgress, Alert } from '@mui/material';
+import {
+  Container, Typography, TextField, Button, Paper, Box, CircularProgress, Alert, FormControlLabel, Checkbox
+} from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import Image from 'next/image'; 
 
 interface PokemonData {
   id: number;
@@ -24,17 +27,11 @@ const fetchPokemonById = async (id: number): Promise<PokemonData> => {
   return response.json();
 };
 
-const updatePokemon = async ({ id, pokemonData }: { id: number, pokemonData: Partial<Omit<PokemonData, 'id'>> }) => {
+// updatePokemon now sends FormData
+const updatePokemonWithUpload = async ({ id, formData }: { id: number, formData: FormData }) => {
   const response = await fetch(`/api/pokemon/${id}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-        ...pokemonData,
-        height: pokemonData.height !== undefined ? Number(pokemonData.height) : undefined,
-        weight: pokemonData.weight !== undefined ? Number(pokemonData.weight) : undefined,
-    }),
+    body: formData,
   });
 
   if (!response.ok) {
@@ -49,67 +46,94 @@ export default function EditPokemonPage() {
   const params = useParams();
   const queryClient = useQueryClient();
   const { data: session, status: sessionStatus } = useSession();
-
   const pokemonId = Number(params.id);
 
   const [name, setName] = React.useState('');
   const [height, setHeight] = React.useState('');
   const [weight, setWeight] = React.useState('');
-  const [image, setImage] = React.useState('');
+  const [currentImageUrl, setCurrentImageUrl] = React.useState<string | null>(null);
+  const [newImageFile, setNewImageFile] = React.useState<File | null>(null);
+  const [removeCurrentImage, setRemoveCurrentImage] = React.useState(false);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
-  const [isAuthorized, setIsAuthorized] = React.useState<boolean | null>(null); 
+  const [isAuthorized, setIsAuthorized] = React.useState<boolean | null>(null);
 
   const { data: pokemon, isLoading: isLoadingPokemon, error: fetchError } = useQuery<PokemonData, Error, PokemonData> ({
     queryKey: ['pokemon', pokemonId],
     queryFn: () => fetchPokemonById(pokemonId),
-    enabled: !!pokemonId && !isNaN(pokemonId) && sessionStatus !== 'loading', 
+    enabled: !!pokemonId && !isNaN(pokemonId) && sessionStatus !== 'loading',
   });
 
   React.useEffect(() => {
-    if (pokemon && session?.user?.id) {
+    if (pokemon) {
+        setName(pokemon.name);
+        setHeight(pokemon.height.toString());
+        setWeight(pokemon.weight.toString());   
+        setCurrentImageUrl(pokemon.image || null);
+    }
+  }, [pokemon]);
+
+  React.useEffect(() => {
+    if (sessionStatus === 'loading' || isLoadingPokemon) return;
+
+    if (!session) {
+        router.replace('/');
+        return;
+    }
+
+    if (pokemon) {
       if (pokemon.userId === null) {
         setFormError('This Pokemon was seeded and cannot be edited.');
         setIsAuthorized(false);
       } else if (pokemon.userId !== session.user.id) {
         setFormError('You are not authorized to edit this Pokemon.');
         setIsAuthorized(false);
-         router.replace('/pokemon/search');
       } else {
-        setName(pokemon.name);
-        setHeight(pokemon.height.toString());
-        setWeight(pokemon.weight.toString());
-        setImage(pokemon.image || '');
         setIsAuthorized(true);
+        if (!name && pokemon.name) setName(pokemon.name); 
+        if (!height && pokemon.height) setHeight(pokemon.height.toString());
+        if (!weight && pokemon.weight) setWeight(pokemon.weight.toString());
+        if (!currentImageUrl && pokemon.image) setCurrentImageUrl(pokemon.image || null);
       }
-    } else if (!isLoadingPokemon && pokemon === null && sessionStatus === 'authenticated') {
+    } else if (!isLoadingPokemon && sessionStatus === 'authenticated') {
         setFormError('Pokemon not found.');
         setIsAuthorized(false);
     }
-  }, [pokemon, session, sessionStatus, isLoadingPokemon, router]);
+  }, [pokemon, session, sessionStatus, isLoadingPokemon, router, name, height, weight, currentImageUrl]);
 
-  const mutation = useMutation<PokemonData, Error, Partial<Omit<PokemonData, 'id' | 'userId'>>>({ // Exclude userId from mutation data
-    mutationFn: (updatedData: Partial<Omit<PokemonData, 'id' | 'userId'>>) => updatePokemon({ id: pokemonId, pokemonData: updatedData }),
+  const mutation = useMutation<PokemonData, Error, FormData>({ 
+    mutationFn: (formData: FormData) => updatePokemonWithUpload({ id: pokemonId, formData }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pokemons'] });
-      queryClient.invalidateQueries({ queryKey: ['pokemon', pokemonId] });
-      router.push('/pokemon/search');
+      queryClient.invalidateQueries({ queryKey: ['pokemons'] }); 
+      queryClient.invalidateQueries({ queryKey: ['pokemon', pokemonId] }); 
+      queryClient.invalidateQueries({ queryKey: ['pokemonDetails', pokemonId]}); 
+      router.push(`/pokemon/${pokemonId}`); 
     },
     onError: (error: Error) => {
       setFormError(error.message);
     },
   });
 
-  React.useEffect(() => {
-    if (sessionStatus === 'loading') return;
-    if (!session) {
-      router.replace('/');
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      setNewImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setRemoveCurrentImage(false); 
+    } else {
+      setNewImageFile(null);
+      setImagePreview(null);
     }
-  }, [session, sessionStatus, router]);
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
 
+    if (!isAuthorized) {
+      setFormError('Not authorized to perform this action.');
+      return;
+    }
     if (!name || !height || !weight) {
       setFormError('Name, Height, and Weight are required.');
       return;
@@ -118,32 +142,40 @@ export default function EditPokemonPage() {
         setFormError('Height and Weight must be numbers.');
         return;
     }
-    
-    if (!isAuthorized) {
-      setFormError("Cannot submit: Not authorized or data error.");
-      return;
-    }
-
-    const updatedData: Partial<Omit<PokemonData, 'id' | 'userId'>> = {};
-    if (!pokemon) {
-        setFormError("Original Pokemon data not loaded. Please refresh.");
+    if (newImageFile && newImageFile.size > 5 * 1024 * 1024) { // 5MB limit
+        setFormError('New image size should not exceed 5MB.');
         return;
     }
 
-    if (name !== pokemon.name) updatedData.name = name;
-    if (Number(height) !== pokemon.height) updatedData.height = Number(height);
-    if (Number(weight) !== pokemon.weight) updatedData.weight = Number(weight);
-    if (image !== (pokemon.image || '')) updatedData.image = image === '' ? null : image;
+    const formData = new FormData();
+    if (!pokemon) {
+        setFormError("Original Pokemon data not available. Please refresh.");
+        return;
+    }
 
-    if (Object.keys(updatedData).length === 0) {
+    let hasChanges = false;
+    if (name !== pokemon.name) { formData.append('name', name); hasChanges = true; }
+    if (Number(height) !== pokemon.height) { formData.append('height', height); hasChanges = true; }
+    if (Number(weight) !== pokemon.weight) { formData.append('weight', weight); hasChanges = true; }
+    
+    if (newImageFile) {
+      formData.append('image', newImageFile);
+      hasChanges = true;
+    } else if (removeCurrentImage && currentImageUrl) {
+      // Only send removeImage if there was an image and it's being removed without a new one.
+      formData.append('removeImage', 'true');
+      hasChanges = true;
+    }
+
+    if (!hasChanges) {
         setFormError("No changes detected to update.");
         return;
     }
 
-    mutation.mutate(updatedData);
+    mutation.mutate(formData);
   };
 
-  if (sessionStatus === 'loading' || isLoadingPokemon || isAuthorized === null) { // Show loader while checking authorization
+  if (sessionStatus === 'loading' || isLoadingPokemon || isAuthorized === null) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -152,38 +184,75 @@ export default function EditPokemonPage() {
   }
 
   if (!session) { 
-    return <Container><Alert severity="warning" sx={{mt: 2}}>Redirecting to login...</Alert></Container>;
+    return <Container><Alert severity="warning" sx={{mt: 2}}>Redirecting...</Alert></Container>;
   }
 
   if (!isAuthorized || fetchError) {
     return (
       <Container sx={{mt: 4}}>
         <Alert severity="error">
-          {formError || fetchError?.message || 'Could not load or edit Pokemon. You might not have permission or the Pokemon does not exist.'}
+          {formError || (fetchError instanceof Error ? fetchError.message : 'Could not load or edit Pokemon.')}
         </Alert>
-        <Button onClick={() => router.push('/pokemon/search')} sx={{mt:2}}>Back to Search</Button>
+        <Button onClick={() => router.push('/')} sx={{mt:2}}>Back to Search</Button>
       </Container>
     );
   }
 
-  // Render form only if authorized
   return (
     <Container maxWidth="sm" sx={{ mt: 4, mb: 4 }}>
       <Paper sx={{ p: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Edit Pokemon: {pokemon?.name || ''}
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} noValidate>
+        <Box component="form" onSubmit={handleSubmit} noValidate encType="multipart/form-data">
+          {/* Name, Height, Weight TextFields */}
           <TextField margin="normal" required fullWidth id="name" label="Name" value={name} onChange={(e) => setName(e.target.value)} error={!!formError && !name} />
-          <TextField margin="normal" required fullWidth id="height" label="Height" type="number" value={height} onChange={(e) => setHeight(e.target.value)} error={!!formError && (!height || isNaN(Number(height)))} />
-          <TextField margin="normal" required fullWidth id="weight" label="Weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} error={!!formError && (!weight || isNaN(Number(weight)))} />
-          <TextField margin="normal" fullWidth id="image" label="Image URL" value={image} onChange={(e) => setImage(e.target.value)} />
+          <TextField margin="normal" required fullWidth id="height" label="Height (e.g., 0.7)" type="number" InputProps={{ inputProps: { step: "0.1" } }} value={height} onChange={(e) => setHeight(e.target.value)} error={!!formError && (!height || isNaN(Number(height)))} />
+          <TextField margin="normal" required fullWidth id="weight" label="Weight (e.g., 6.9)" type="number" InputProps={{ inputProps: { step: "0.1" } }} value={weight} onChange={(e) => setWeight(e.target.value)} error={!!formError && (!weight || isNaN(Number(weight)))} />
           
-          {(mutation.isError || (formError && !isAuthorized)) && ( 
+          {/* Current Image Preview */}
+          {currentImageUrl && !imagePreview && !removeCurrentImage && (
+            <Box sx={{ mt: 2, mb:1, textAlign: 'center' }}>
+              <Typography variant="subtitle2">Current Image:</Typography>
+              <Image src={currentImageUrl} alt="Current Pokemon image" width={150} height={150} style={{ objectFit: 'contain' }} />
+            </Box>
+          )}
+
+          {/* New Image Preview */}
+          {imagePreview && (
+            <Box sx={{ mt: 2, mb:1, textAlign: 'center' }}>
+              <Typography variant="subtitle2">New Image Preview:</Typography>
+              <img src={imagePreview} alt="New image preview" style={{ maxWidth: '100%', maxHeight: '150px', marginTop: '8px' }} />
+            </Box>
+          )}
+
+          <Button
+            variant="contained"
+            component="label"
+            fullWidth
+            sx={{ mt: 2, mb: 1 }}
+          >
+            {currentImageUrl || imagePreview ? 'Change Image' : 'Upload Image'}
+            <input type="file" hidden accept="image/png, image/jpeg, image/gif, image/webp" onChange={handleImageChange} />
+          </Button>
+
+          {currentImageUrl && !newImageFile && (
+            <FormControlLabel
+              control={<Checkbox checked={removeCurrentImage} onChange={(e) => setRemoveCurrentImage(e.target.checked)} />}
+              label="Remove current image"
+              sx={{display: 'block', mt:1}}
+            />
+          )}
+          
+          {(mutation.isError || (formError && formError !== 'No changes detected to update.' && formError !== 'This Pokemon was seeded and cannot be edited.' && formError !== 'You are not authorized to edit this Pokemon.' && formError !== 'Pokemon not found.' )) && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {formError || mutation.error?.message || 'An unexpected error occurred.'}
+              {formError || (mutation.error instanceof Error ? mutation.error.message : 'An unexpected error occurred.')}
             </Alert>
           )}
+          {formError && (formError === 'No changes detected to update.') && (
+             <Alert severity="info" sx={{ mt: 2 }}>{formError}</Alert>
+          )}
+
 
           <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }} disabled={mutation.isPending || isLoadingPokemon || !isAuthorized}>
             {mutation.isPending ? <CircularProgress size={24} /> : 'Save Changes'}

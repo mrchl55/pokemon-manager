@@ -12,13 +12,14 @@ import {
   PokeApiSpeciesResponse, 
   PokeApiPokemonResponse, 
   PokeApiDetailsType
-} from '@/types/pokemon'; // Import types
+} from '@/types/pokemon'; 
+import fs from 'fs/promises';
+import path from 'path';
+import { Prisma } from '@prisma/client'; 
 
 interface RouteParams {
   id: string;
 }
-
-// PokeAPI type definitions moved to @/types/pokemon.ts
 
 const fetchPokeApiData = async (pokemonNameOrId: string | number): Promise<PokeApiDetailsType | null> => {
   try {
@@ -93,6 +94,19 @@ const fetchPokeApiData = async (pokemonNameOrId: string | number): Promise<PokeA
   }
 };
 
+async function streamToBuffer(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+    }
+  }
+  return Buffer.concat(chunks);
+}
+
 export async function GET(request: Request,  context: { params: Promise<{ id: number }> }) {
   const { id } = await context.params;
   const pokemonDbId = +id
@@ -118,7 +132,7 @@ export async function GET(request: Request,  context: { params: Promise<{ id: nu
       return NextResponse.json(combinedData);
     }
 
-    return NextResponse.json(localPokemon); // Default: return basic data
+    return NextResponse.json(localPokemon); 
   } catch (error) {
     console.error(`API Error fetching Pokemon ${pokemonDbId}:`, error);
     return NextResponse.json({ message: 'Error fetching Pokemon data' }, { status: 500 });
@@ -131,7 +145,6 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
     return NextResponse.json({ message: 'Unauthorized. Please log in.' }, { status: 401 });
   }
   const currentUserId = session.user.id;
-
   const { id } = params;
   const pokemonId = parseInt(id, 10);
 
@@ -140,37 +153,99 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
   }
 
   try {
-    const body = await request.json();
-    const { name, height, weight, image } = body as { name?: string, height?: number, weight?: number, image?: string | null };
+    const formData = await request.formData();
+    const name = formData.get('name') as string | undefined;
+    const heightStr = formData.get('height') as string | undefined;
+    const weightStr = formData.get('weight') as string | undefined;
+    const imageFile = formData.get('image') as File | null;
+    const imageToBeRemovedStr = formData.get('removeImage') as string | undefined;
+    const imageToBeRemoved = imageToBeRemovedStr === 'true';
 
-    if (Object.keys(body).length === 0) {
+    const updatePayload: { name?: string; height?: number; weight?: number; image?: string | null; imageToBeRemoved?: boolean } = {};
+
+    if (name) updatePayload.name = name;
+    if (heightStr) {
+      const height = parseFloat(heightStr);
+      if (isNaN(height)) return NextResponse.json({ message: 'Height must be a valid number' }, { status: 400 });
+      updatePayload.height = height;
+    }
+    if (weightStr) {
+      const weight = parseFloat(weightStr);
+      if (isNaN(weight)) return NextResponse.json({ message: 'Weight must be a valid number' }, { status: 400 });
+      updatePayload.weight = weight;
+    }
+
+    const pokemonToUpdate = await pokemonService.getPokemonById(pokemonId);
+    if (!pokemonToUpdate) {
+      return NextResponse.json({ message: 'Pokemon not found for update check' }, { status: 404 });
+    }
+
+    let newImageFilePath: string | null | undefined = undefined; // undefined means no change, null means remove
+
+    if (imageFile && imageFile.size > 0) {
+      if (pokemonToUpdate.image && pokemonToUpdate.image.startsWith('/uploads/pokemon/')) {
+        const oldImagePath = path.join(process.cwd(), 'public', pokemonToUpdate.image);
+        try {
+          await fs.unlink(oldImagePath);
+        } catch (unlinkError: any) {
+          if (unlinkError.code !== 'ENOENT') { // Ignore if file doesn't exist
+             console.warn(`Could not delete old image ${oldImagePath}:`, unlinkError);
+          }
+        }
+      }
+
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'pokemon');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      const originalFilename = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, '');
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = uniqueSuffix + '-' + originalFilename;
+      const fullFilePath = path.join(uploadsDir, filename);
+      if (!imageFile.stream) return NextResponse.json({ message: 'Image file stream is not available.'}, {status: 400});
+      const buffer = await streamToBuffer(imageFile.stream());
+      await fs.writeFile(fullFilePath, buffer);
+      newImageFilePath = `/uploads/pokemon/${filename}`;
+      updatePayload.image = newImageFilePath;
+    } else if (imageToBeRemoved) {
+      if (pokemonToUpdate.image && pokemonToUpdate.image.startsWith('/uploads/pokemon/')) {
+        const oldImagePath = path.join(process.cwd(), 'public', pokemonToUpdate.image);
+        try {
+          await fs.unlink(oldImagePath);
+        } catch (unlinkError: any) {
+           if (unlinkError.code !== 'ENOENT') {
+             console.warn(`Could not delete old image ${oldImagePath}:`, unlinkError);
+           }
+        }
+      }
+      updatePayload.image = null; 
+      updatePayload.imageToBeRemoved = true; 
+    }
+
+    if (Object.keys(updatePayload).length === 0 && newImageFilePath === undefined && !imageToBeRemoved) {
         return NextResponse.json({ message: 'No update data provided' }, { status: 400 });
     }
-    if (height !== undefined && typeof height !== 'number') {
-        return NextResponse.json({ message: 'Height must be a number' }, { status: 400 });
-    }
-    if (weight !== undefined && typeof weight !== 'number') {
-        return NextResponse.json({ message: 'Weight must be a number' }, { status: 400 });
-    }
 
-    const result = await pokemonService.updatePokemon(pokemonId, { name, height, weight, image }, currentUserId);
+    const result = await pokemonService.updatePokemon(pokemonId, updatePayload, currentUserId);
 
     if (result && typeof result === 'object' && 'error' in result && result.error && typeof result.status === 'number') {
       return NextResponse.json({ message: result.error }, { status: result.status });
     }
-    
     if (result && typeof result === 'object' && !('error' in result)) {
       return NextResponse.json(result);
     }
     
-    // This case should ideally not be reached if service responses are consistent
     console.error(`API error updating pokemon ${pokemonId}: Unexpected service response`, result);
     return NextResponse.json({ message: 'Error updating pokemon: Unexpected response from service' }, { status: 500 });
 
-  } catch (e: unknown) { // Changed from error: any to e: unknown for better type safety
+  } catch (e: unknown) {
     console.error(`API error updating pokemon ${pokemonId}:`, e);
-    // Explicitly type error as 'Error' or 'unknown' then check properties
-    const message = e instanceof Error ? e.message : 'Error updating pokemon';
+    let message = 'Error updating pokemon';
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      message = 'A Pokemon with this name already exists.';
+      return NextResponse.json({ message }, { status: 409 });
+    }
+     if (e instanceof Error) {
+        message = e.message;
+    }
     return NextResponse.json({ message }, { status: 500 });
   }
 }
@@ -199,7 +274,6 @@ export async function DELETE(request: Request, { params }: { params: RouteParams
     }
   } catch (error) {
     console.error(`API error deleting pokemon ${pokemonId}:`, error);
-    // Explicitly type error as 'Error' or 'unknown' then check properties
     const message = error instanceof Error ? error.message : 'Error deleting pokemon';
     return NextResponse.json({ message }, { status: 500 });
   }

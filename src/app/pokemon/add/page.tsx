@@ -6,24 +6,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
-interface NewPokemonData {
+// NewPokemonData now expects a File or null for imageFile
+interface NewPokemonFormData {
   name: string;
-  height: number | string;
-  weight: number | string;
-  image?: string;
+  height: string; // Keep as string for form input, convert before sending
+  weight: string; // Keep as string for form input, convert before sending
+  imageFile?: File | null; // For the uploaded file
 }
 
-const createPokemon = async (pokemonData: NewPokemonData) => {
+const createPokemonWithUpload = async (formData: FormData) => {
   const response = await fetch('/api/pokemon', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-        ...pokemonData,
-        height: Number(pokemonData.height),
-        weight: Number(pokemonData.weight),
-    }),
+    body: formData, // Send FormData directly
+    // 'Content-Type': 'multipart/form-data' is set automatically by browser with FormData
   });
 
   if (!response.ok) {
@@ -41,14 +36,15 @@ export default function AddPokemonPage() {
   const [name, setName] = React.useState('');
   const [height, setHeight] = React.useState('');
   const [weight, setWeight] = React.useState('');
-  const [image, setImage] = React.useState('');
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: createPokemon,
+    mutationFn: createPokemonWithUpload,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pokemons'] });
-      router.push('/pokemon/search');
+      router.push('/'); // Redirect to homepage after successful creation
     },
     onError: (error: Error) => {
       setFormError(error.message);
@@ -62,6 +58,16 @@ export default function AddPokemonPage() {
     }
   }, [session, status, router]);
 
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setImageFile(null);
+      setImagePreview(null);
+    }
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,8 +81,20 @@ export default function AddPokemonPage() {
         setFormError('Height and Weight must be numbers.');
         return;
     }
+    if (imageFile && imageFile.size > 5 * 1024 * 1024) { // 5MB limit
+        setFormError('Image size should not exceed 5MB.');
+        return;
+    }
 
-    mutation.mutate({ name, height, weight, image });
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('height', height);
+    formData.append('weight', weight);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
+    mutation.mutate(formData);
   };
 
   if (status === 'loading' || !session) {
@@ -93,7 +111,7 @@ export default function AddPokemonPage() {
         <Typography variant="h4" component="h1" gutterBottom>
           Add New Pokemon
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} noValidate>
+        <Box component="form" onSubmit={handleSubmit} noValidate encType="multipart/form-data">
           <TextField
             margin="normal"
             required
@@ -112,9 +130,10 @@ export default function AddPokemonPage() {
             required
             fullWidth
             id="height"
-            label="Height"
+            label="Height (e.g., 0.7 for 0.7m)"
             name="height"
             type="number"
+            InputProps={{ inputProps: { step: "0.1" } }}
             value={height}
             onChange={(e) => setHeight(e.target.value)}
             error={!!formError && (!height || isNaN(Number(height)))}
@@ -124,31 +143,44 @@ export default function AddPokemonPage() {
             required
             fullWidth
             id="weight"
-            label="Weight"
+            label="Weight (e.g., 6.9 for 6.9kg)"
             name="weight"
             type="number"
+            InputProps={{ inputProps: { step: "0.1" } }}
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             error={!!formError && (!weight || isNaN(Number(weight)))}
           />
-          <TextField
-            margin="normal"
-            fullWidth
-            id="image"
-            label="Image URL (Official Artwork)"
-            name="image"
-            value={image}
-            onChange={(e) => setImage(e.target.value)}
-          />
           
-          {mutation.isError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {mutation.error?.message || 'An unexpected error occurred.'}
-            </Alert>
+          <Button
+            variant="contained"
+            component="label"
+            fullWidth
+            sx={{ mt: 2, mb: 1 }}
+          >
+            Upload Image
+            <input
+              type="file"
+              hidden
+              accept="image/png, image/jpeg, image/gif, image/webp"
+              onChange={handleImageChange}
+            />
+          </Button>
+          {imagePreview && (
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Typography variant="subtitle2">Image Preview:</Typography>
+              <img src={imagePreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', marginTop: '8px' }} />
+            </Box>
           )}
           {formError && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               {formError}
+            </Alert>
+          )}
+          {mutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {/* Make sure mutation.error is an instance of Error before accessing message */}
+              {mutation.error instanceof Error ? mutation.error.message : 'An unexpected error occurred.'}
             </Alert>
           )}
 

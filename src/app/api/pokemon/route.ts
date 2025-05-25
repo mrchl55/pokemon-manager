@@ -5,6 +5,7 @@ import { pokemonService, PokemonFilters } from '@/services/pokemon.service';
 import { Prisma } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
+import { streamToBuffer } from '@/lib/imageUtils';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -78,19 +79,6 @@ export async function GET(request: Request) {
   }
 }
 
-async function streamToBuffer(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-    }
-  }
-  return Buffer.concat(chunks);
-}
-
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user || !session.user.id) {
@@ -146,13 +134,13 @@ export async function POST(request: Request) {
   } catch (e: unknown) {
     console.error('API Error creating pokemon:', e);
     let message = 'Error creating pokemon';
+    let status = 500;
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       message = 'A Pokemon with this name already exists.';
-      return NextResponse.json({ message }, { status: 409 });
-    }
-    if (e instanceof Error) {
+      status = 409;
+    } else if (e instanceof Error) {
         message = e.message;
     }
-    return NextResponse.json({ message }, { status: 500 });
+    return NextResponse.json({ message }, { status });
   }
 } 

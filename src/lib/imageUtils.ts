@@ -32,4 +32,3 @@ export async function streamToBuffer(stream: ReadableStream<Uint8Array>): Promis
     return Buffer.concat(chunks);
   }
   
-  // We can add more shared API utility functions here in the future. 

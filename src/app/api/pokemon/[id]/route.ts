@@ -13,8 +13,8 @@ interface RouteParams {
   id: string;
 }
 
-export async function GET(request: Request,  context: { params: Promise<{ id: number }> }) {
-  const { id } = await context.params;
+export async function GET(request: Request,  context: { params: RouteParams }) {
+  const { id } = context.params;
   const pokemonDbId = +id
   const { searchParams } = new URL(request.url);
   const view = searchParams.get('view');
@@ -111,15 +111,12 @@ export async function PUT(request: Request, { params }: { params: RouteParams })
 
     const result = await pokemonService.updatePokemon(pokemonId, updatePayload, currentUserId);
 
-    if (result && typeof result === 'object' && 'error' in result && result.error && typeof result.status === 'number') {
-      return NextResponse.json({ message: result.error }, { status: result.status });
-    }
-    if (result && typeof result === 'object' && !('error' in result)) {
-      return NextResponse.json(result);
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      const status = typeof result.status === 'number' ? result.status : 400;
+      return NextResponse.json({ message: result.error }, { status });
     }
     
-    console.error(`API error updating pokemon ${pokemonId}: Unexpected service response`, result);
-    return NextResponse.json({ message: 'Error updating pokemon: Unexpected response from service' }, { status: 500 });
+    return NextResponse.json(result);
 
   } catch (e: unknown) {
     console.error(`API error updating pokemon ${pokemonId}:`, e);

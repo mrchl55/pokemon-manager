@@ -194,19 +194,48 @@ export default function PokemonDetailPage() {
           </Grid>
           
           {stats && stats.length > 0 && (
-            <Grid size={{xs:12}} sx={{mt:2}}>
+            <Grid size={{xs:12, md: 5}} sx={{mt:2}}>
                 <Typography variant="h5" gutterBottom sx={{fontWeight: 'bold', textAlign: {xs: 'center', md: 'left'} }}>Stats</Typography>
-                <Paper variant="outlined" sx={{p:2, backgroundColor: '#E5E7EB', borderRadius:'8px'}}>
-                    <Grid container spacing={{xs: 1, sm: 2}}>
-                        {stats.map(stat => (
-                            <Grid key={stat.name} size={{xs:6, sm:4, md:2}} sx={{textAlign: 'center'}}>
-                                <Typography variant="subtitle1" sx={{fontWeight:'bold'}}>{stat.base_stat}</Typography>
-                                <Box sx={{ width: '80%', margin: 'auto', backgroundColor: '#9CA3AF', borderRadius: '4px', overflow: 'hidden', height: 8, mt: 0.5, mb:0.5 }}>
-                                    <Box sx={{ width: `${Math.min((stat.base_stat / 180) * 100, 100)}%`, backgroundColor: '#60A5FA', height: '100%' }} />
-                                </Box>
-                                <Typography variant="caption" sx={{textTransform: 'capitalize', display:'block'}}>{stat.name.replace('-', ' ' )}</Typography>
-                            </Grid>
-                        ))}
+                <Paper variant="outlined" sx={{p:2, backgroundColor: '#E5E7EB', borderRadius:'8px' }}>
+                    <Grid container spacing={{xs: 1, sm: 1.5, md: 2}} justifyContent="space-around">
+                        {stats.map(stat => {
+                            const MAX_STAT_VALUE = 200;
+                            const NUM_SEGMENTS = 10;
+                            const segmentHeight = 10;
+                            const totalBarHeight = NUM_SEGMENTS * (segmentHeight + 1);
+                            const filledSegments = Math.round((stat.base_stat / MAX_STAT_VALUE) * NUM_SEGMENTS);
+
+                            return (
+                                <Grid key={stat.name} size={{xs: "auto"}} sx={{textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+                                    <Box sx={{
+                                        height: `${totalBarHeight}px`,
+                                        width: '30px',
+                                        display: 'flex',
+                                        flexDirection: 'column-reverse',
+                                        mb: 0.5
+                                    }}>
+                                        {[...Array(NUM_SEGMENTS)].map((_, index) => (
+                                            <Box
+                                                key={index}
+                                                sx={{
+                                                    height: `${segmentHeight}px`,
+                                                    width: '100%',
+                                                    backgroundColor: index < filledSegments ? '#60A5FA' : '#D1D5DB',
+                                                    borderTop: index > 0 ? '1px solid #9CA3AF' : 'none',
+                                                    '&:first-of-type': {
+                                                        borderTop: '1px solid #9CA3AF',
+                                                    },
+                                                    '&:last-of-type': {
+                                                         borderBottom: '1px solid #9CA3AF'
+                                                    }
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Typography variant="caption" sx={{textTransform: 'capitalize', display:'block'}}>{stat.name.replace('-', ' ' )}</Typography>
+                                </Grid>
+                            );
+                        })}
                     </Grid>
                 </Paper>
             </Grid>
